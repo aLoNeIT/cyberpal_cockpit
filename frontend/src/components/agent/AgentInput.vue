@@ -27,21 +27,21 @@ function handleKeydown(e: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="border-t border-cockpit-border flex items-center gap-2 px-3 py-2 bg-cockpit-bg/50">
+  <div class="border-t border-cockpit-border flex items-center gap-2 px-3 py-2 bg-cockpit-bg/60">
     <input
       v-model="inputText"
       :disabled="disabled"
       type="text"
-      placeholder="Type input and press Enter..."
-      class="flex-1 bg-transparent border-none outline-none text-sm text-cockpit-text placeholder-cockpit-muted font-mono"
+      placeholder="输入指令后按回车发送..."
+      class="flex-1 bg-cockpit-surface-sunken border border-cockpit-border rounded-sm px-3 py-[7px] text-[13px] text-cockpit-text placeholder:text-cockpit-text-placeholder font-mono outline-none transition-colors duration-150 focus:border-cockpit-accent focus:shadow-[0_0_0_3px_rgba(var(--color-accent),0.25)] disabled:bg-cockpit-surface-sunken disabled:cursor-not-allowed"
       @keydown="handleKeydown"
     />
     <button
       :disabled="disabled || !inputText.trim()"
-      class="text-xs px-3 py-1 rounded-md bg-cockpit-accent/20 text-cockpit-accent hover:bg-cockpit-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+      class="text-[13px] font-medium px-3.5 py-[7px] rounded-sm bg-cockpit-accent text-white hover:bg-cockpit-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex-shrink-0"
       @click="handleSend"
     >
-      Send
+      发送
     </button>
   </div>
 </template>

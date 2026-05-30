@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import '@fontsource-variable/inter';
+import '@fontsource-variable/cascadia-code';
 import './index.css';
 import { initTheme } from './composables/useTheme';
 

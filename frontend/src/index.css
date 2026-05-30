@@ -2,34 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ Inter Variable Font ============ */
-/* @fontsource-variable/inter — imported in main.ts, zero CDN dependency */
+/* ================================================================
+   CyberPal Cockpit — UI Design System v1.0
+   参考来源：docs/ui-design-system.md
+   ================================================================ */
 
-/* ============ 主题 CSS 变量 ============ */
+/* ============ 设计令牌（CSS 变量） ============ */
 
 :root,
 [data-theme="light"] {
-  --color-bg: 248 249 250;
-  --color-surface: 255 255 255;
-  --color-border: 226 232 240;
-  --color-text: 26 32 44;
-  --color-text-secondary: 113 128 150;
-  --color-accent: 59 130 246;
-  --color-danger: 239 68 68;
-  --color-warning: 245 158 11;
-  --color-success: 16 185 129;
+  /* 背景/表面 */
+  --color-bg: 247 248 250;              /* #F7F8FA 页面最底层背景 */
+  --color-surface: 255 255 255;          /* #FFFFFF 卡片、面板、弹窗底色 */
+  --color-surface-hover: 240 241 243;    /* #F0F1F3 悬浮/激活态表面色 */
+  --color-surface-sunken: 235 237 241;   /* #EBEDF1 凹陷区域（输入框内部、终端背景） */
+
+  /* 边框 */
+  --color-border: 228 231 235;           /* #E4E7EB 默认边框 */
+  --color-border-strong: 200 205 212;    /* #C8CDD4 强调型边框（聚焦环等） */
+
+  /* 文字 */
+  --color-text: 26 32 44;                /* #1A202C 主文字 */
+  --color-text-secondary: 107 124 147;   /* #6B7C93 次要文字、说明文案 */
+  --color-text-placeholder: 160 170 185; /* #A0AAB9 占位文字 */
+
+  /* 品牌/强调色 */
+  --color-accent: 99 102 241;            /* #6366F1 品牌色/主强调色（Indigo 500） */
+  --color-accent-hover: 79 70 229;       /* #4F46E5 强调色 hover 态（Indigo 600） */
+  --color-accent-subtle: 224 231 255;    /* #E0E7FF 强调色浅底（Indigo 50） */
+
+  /* 语义色 */
+  --color-success: 16 185 129;           /* #10B981 成功状态（Emerald 500） */
+  --color-success-subtle: 209 250 229;   /* #D1FAE5 成功浅底（Emerald 50） */
+  --color-warning: 245 158 11;           /* #F59E0B 警告状态（Amber 500） */
+  --color-warning-subtle: 254 243 199;   /* #FEF3C7 警告浅底（Amber 50） */
+  --color-danger: 239 68 68;             /* #EF4444 危险状态（Red 500） */
+  --color-danger-subtle: 254 226 226;    /* #FEE2E2 危险浅底（Red 50） */
+
+  /* 阴影 */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.08);
+  --shadow-accent: 0 0 0 3px rgba(99,102,241,0.25);
+  --shadow-accent-dark: 0 0 0 3px rgba(129,140,248,0.35);
 }
 
 [data-theme="dark"] {
-  --color-bg: 13 17 23;
-  --color-surface: 22 27 34;
-  --color-border: 48 54 61;
-  --color-text: 201 209 217;
-  --color-text-secondary: 139 148 158;
-  --color-accent: 88 166 255;
-  --color-danger: 248 81 73;
-  --color-warning: 210 153 29;
-  --color-success: 63 185 80;
+  /* 背景/表面 */
+  --color-bg: 15 17 23;                  /* #0F1117 页面最底层背景（深灰蓝，非纯黑） */
+  --color-surface: 26 31 46;             /* #1A1F2E 卡片、面板、弹窗底色 */
+  --color-surface-hover: 35 41 56;       /* #232938 悬浮/激活态表面色 */
+  --color-surface-sunken: 20 24 36;      /* #141828 凹陷区域 */
+
+  /* 边框 */
+  --color-border: 45 53 72;              /* #2D3548 默认边框 */
+  --color-border-strong: 75 85 105;      /* #4B5569 强调型边框 */
+
+  /* 文字 */
+  --color-text: 201 209 217;             /* #C9D1D9 主文字 */
+  --color-text-secondary: 139 148 158;   /* #8B949E 次要文字 */
+  --color-text-placeholder: 90 100 115;  /* #5A6473 占位文字 */
+
+  /* 品牌/强调色 */
+  --color-accent: 129 140 248;           /* #818CF8 品牌色（Indigo 400，提亮以适配深色） */
+  --color-accent-hover: 165 180 252;     /* #A5B4FC 强调色 hover 态（Indigo 300） */
+  --color-accent-subtle: 49 57 89;       /* #313959 强调色浅底（深 Indigo） */
+
+  /* 语义色 */
+  --color-success: 52 211 153;           /* #34D399 成功状态 */
+  --color-success-subtle: 20 55 44;      /* #14372C 成功浅底 */
+  --color-warning: 251 191 36;           /* #FBBF24 警告状态 */
+  --color-warning-subtle: 60 48 10;      /* #3C300A 警告浅底 */
+  --color-danger: 248 113 113;           /* #F87171 危险状态 */
+  --color-danger-subtle: 70 20 25;       /* #46141A 危险浅底 */
+
+  /* 阴影（深色模式需加亮而非加暗） */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.4);
+  --shadow-accent: 0 0 0 3px rgba(129,140,248,0.25);
+  --shadow-accent-dark: 0 0 0 3px rgba(129,140,248,0.35);
+}
+
+/* ============ 视觉尺度令牌 ============ */
+
+:root {
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* 过渡曲线 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* ============ 全局基础样式 ============ */
@@ -48,73 +117,122 @@ html, body, #app {
   line-height: 1.5;
   letter-spacing: -0.011em;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-variation-settings: 'wght' 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: rgb(var(--color-bg));
   color: rgb(var(--color-text));
 }
 
-/* ============ 滚动条 ============ */
+/* ============ 滚动条（4px 精致设计） ============ */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(var(--color-bg));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: rgb(var(--color-border));
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--color-text-secondary));
 }
 
+/* ============ 动画关键帧 ============ */
+
+/* 状态脉冲呼吸（running 态） */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--color-accent), 0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(var(--color-accent), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--color-accent), 0); }
+}
+
+/* 错误快速闪烁 */
+@keyframes blink-danger {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* 边框呼吸（运行中 AgentCell 左边缘） */
+@keyframes border-pulse {
+  0%, 100% { border-color: rgb(var(--color-accent)); }
+  50%      { border-color: rgba(var(--color-accent), 0.3); }
+}
+
+/* ============ 无障碍：减少动效 ============ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ============ 现代字型层级工具类 ============ */
 
 @layer utilities {
-  /* 标题层级 */
+  /* ─── 标题层级 ─── */
   .type-display {
-    @apply text-2xl font-bold tracking-tight leading-tight;
+    @apply text-[36px] font-extrabold tracking-[-0.02em] leading-[1.1];
+    font-variation-settings: 'wght' 800;
+  }
+  .type-hero {
+    @apply text-[28px] font-bold tracking-[-0.019em] leading-[1.2];
+    font-variation-settings: 'wght' 700;
   }
   .type-title {
-    @apply text-lg font-semibold tracking-tight leading-snug;
+    @apply text-[22px] font-semibold tracking-[-0.019em] leading-[1.3];
+    font-variation-settings: 'wght' 600;
   }
   .type-heading {
-    @apply text-sm font-semibold leading-snug;
+    @apply text-[18px] font-semibold tracking-[-0.014em] leading-[1.35];
+    font-variation-settings: 'wght' 600;
   }
   .type-subheading {
-    @apply text-sm font-medium text-cockpit-muted leading-snug;
+    @apply text-[16px] font-medium tracking-[-0.011em] leading-[1.4];
+    font-variation-settings: 'wght' 500;
   }
 
-  /* 正文层级 */
+  /* ─── 正文层级 ─── */
   .type-body {
-    @apply text-sm leading-normal;
+    @apply text-[14px] font-normal tracking-[-0.011em] leading-[1.5];
   }
   .type-body-sm {
-    @apply text-xs leading-normal;
+    @apply text-[13px] font-normal tracking-[-0.006em] leading-[1.5];
+  }
+  .type-body-xs {
+    @apply text-[12px] font-normal tracking-normal leading-[1.5];
   }
 
-  /* 标签/标注层级 */
+  /* ─── 标签/标注层级 ─── */
   .type-label {
-    @apply text-xs font-medium tracking-wide uppercase;
+    @apply text-[12px] font-semibold tracking-[0.04em] leading-[1.5];
+    font-variation-settings: 'wght' 600;
   }
   .type-caption {
-    @apply text-[11px] font-medium text-cockpit-muted leading-tight;
+    @apply text-[11px] font-medium tracking-[0.01em] leading-[1.4];
+    font-variation-settings: 'wght' 500;
   }
   .type-overline {
-    @apply text-[11px] font-semibold text-cockpit-muted tracking-widest uppercase;
+    @apply text-[11px] font-bold tracking-[0.08em] leading-[1.4] uppercase;
+    font-variation-settings: 'wght' 700;
   }
 
-  /* 等宽字体层级 */
+  /* ─── 等宽字体层级 ─── */
   .type-mono {
-    @apply font-mono text-xs;
+    @apply font-mono text-[13px];
   }
   .type-mono-sm {
     @apply font-mono text-[11px];
+  }
+  .type-mono-lg {
+    @apply font-mono text-[14px];
   }
 }

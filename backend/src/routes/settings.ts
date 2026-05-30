@@ -12,7 +12,7 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
       const response: ApiResponse<ProviderSummary[]> = { code: 0, data: summaries, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -23,13 +23,13 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
       const { id } = req.params;
       const detail: ProviderDetail | null = providerConfigService.getProviderDetail(id);
       if (!detail) {
-        res.status(404).json({ code: -1, data: null, message: `Provider not found: ${id}` });
+        res.status(404).json({ code: -1, data: null, message: `未找到提供商：${id}` });
         return;
       }
       const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -39,11 +39,11 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
     try {
       const { id, name, baseUrl } = req.body as CreateProviderRequest;
       if (!id || !name || !baseUrl) {
-        res.status(400).json({ code: -1, data: null, message: 'id, name, and baseUrl are required' });
+        res.status(400).json({ code: -1, data: null, message: 'id、name 和 baseUrl 为必填项' });
         return;
       }
       if (!/^[a-z][a-z0-9_-]*$/.test(id)) {
-        res.status(400).json({ code: -1, data: null, message: 'id must start with a letter and contain only lowercase letters, digits, hyphens, and underscores' });
+        res.status(400).json({ code: -1, data: null, message: 'id 必须以字母开头，且仅包含小写字母、数字、连字符和下划线' });
         return;
       }
       const created = await providerConfigService.addProvider(id, name, baseUrl);
@@ -54,10 +54,10 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         apiKey: '',
         models: [],
       };
-      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: 'Provider created' };
+      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: '提供商创建成功' };
       res.status(201).json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(400).json({ code: -1, data: null, message });
     }
   });
@@ -69,18 +69,18 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
       // 不允许删除默认的 4 家
       const defaults = ['deepseek', 'openai', 'alibaba', 'anthropic'];
       if (defaults.includes(id)) {
-        res.status(400).json({ code: -1, data: null, message: 'Cannot delete built-in providers. You can reset their configuration instead.' });
+        res.status(400).json({ code: -1, data: null, message: '不可删除内置提供商。但可以重置其配置。' });
         return;
       }
       const deleted = await providerConfigService.deleteProvider(id);
       if (!deleted) {
-        res.status(404).json({ code: -1, data: null, message: `Provider not found: ${id}` });
+        res.status(404).json({ code: -1, data: null, message: `未找到提供商：${id}` });
         return;
       }
-      const response: ApiResponse<null> = { code: 0, data: null, message: 'Provider deleted' };
+      const response: ApiResponse<null> = { code: 0, data: null, message: '提供商已删除' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -93,7 +93,7 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
 
       const updated = await providerConfigService.updateProvider(id, updates);
       if (!updated) {
-        res.status(404).json({ code: -1, data: null, message: `Provider not found: ${id}` });
+        res.status(404).json({ code: -1, data: null, message: `未找到提供商：${id}` });
         return;
       }
 
@@ -105,10 +105,10 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         models: updated.models.map((m) => ({ ...m })),
       };
 
-      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: 'Provider updated' };
+      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: '提供商已更新' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(400).json({ code: -1, data: null, message });
     }
   });
@@ -120,13 +120,13 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
       const { apiKey } = req.body as { apiKey: string };
 
       if (apiKey === undefined || apiKey === null) {
-        res.status(400).json({ code: -1, data: null, message: 'apiKey is required' });
+        res.status(400).json({ code: -1, data: null, message: 'apiKey 为必填项' });
         return;
       }
 
       const updated: ProviderConfig | null = await providerConfigService.updateApiKey(id, apiKey);
       if (!updated) {
-        res.status(404).json({ code: -1, data: null, message: `Provider not found: ${id}` });
+        res.status(404).json({ code: -1, data: null, message: `未找到提供商：${id}` });
         return;
       }
 
@@ -138,10 +138,10 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         models: updated.models.map((m) => ({ ...m })),
       };
 
-      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: 'API key updated' };
+      const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: 'API 密钥已更新' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(400).json({ code: -1, data: null, message });
     }
   });

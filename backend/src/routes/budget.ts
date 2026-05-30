@@ -13,7 +13,7 @@ export function createBudgetRoutes(budgetController: BudgetController, tokenTrac
       const response: ApiResponse<BudgetConfig> = { code: 0, data: config, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -22,10 +22,10 @@ export function createBudgetRoutes(budgetController: BudgetController, tokenTrac
   router.put('/budget', (req: Request, res: Response) => {
     try {
       const config: BudgetConfig = budgetController.updateConfig(req.body);
-      const response: ApiResponse<BudgetConfig> = { code: 0, data: config, message: 'Budget updated' };
+      const response: ApiResponse<BudgetConfig> = { code: 0, data: config, message: '预算已更新' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(400).json({ code: -1, data: null, message });
     }
   });
@@ -37,7 +37,7 @@ export function createBudgetRoutes(budgetController: BudgetController, tokenTrac
       const response: ApiResponse<BudgetStatus> = { code: 0, data: status, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -60,7 +60,7 @@ export function createBudgetRoutes(budgetController: BudgetController, tokenTrac
       const response: ApiResponse<DailyTokenRecord[]> = { code: 0, data: records, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });

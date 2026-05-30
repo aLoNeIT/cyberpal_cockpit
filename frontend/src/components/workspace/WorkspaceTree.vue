@@ -89,7 +89,7 @@ function getIcon(node: FileTreeNode): string {
           />
         </div>
         <div v-else-if="isExpanded(node.path) && (!node.children || node.children.length === 0)" class="ml-3 pl-7 py-0.5 text-2xs text-cockpit-muted">
-          (empty)
+          (空)
         </div>
       </div>
 

@@ -26,7 +26,7 @@ watch(() => props.content, (newVal) => {
       v-html="displayContent"
     ></div>
     <div v-if="!displayContent" class="text-cockpit-muted text-sm text-center mt-4">
-      Waiting for Markdown output...
+      等待 Markdown 输出...
     </div>
   </div>
 </template>

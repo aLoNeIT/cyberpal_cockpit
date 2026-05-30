@@ -35,9 +35,9 @@ const theme = useTheme();
 const showThemeMenu = ref(false);
 
 const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
-  { mode: 'light', label: 'Light', icon: '☀️' },
-  { mode: 'dark', label: 'Dark', icon: '🌙' },
-  { mode: 'system', label: 'System', icon: '🖥' },
+  { mode: 'light', label: '浅色', icon: '☀️' },
+  { mode: 'dark', label: '深色', icon: '🌙' },
+  { mode: 'system', label: '跟随系统', icon: '🖥' },
 ];
 
 function onSelectTheme(mode: ThemeMode): void {
@@ -52,11 +52,11 @@ function onSelectTheme(mode: ThemeMode): void {
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
         <span class="text-cockpit-accent font-bold text-sm tracking-tight">CPC</span>
-        <span class="text-cockpit-muted text-xs hidden sm:inline">CyberPal Cockpit</span>
+        <span class="text-cockpit-muted text-xs hidden sm:inline">赛博帕鲁驾驶舱</span>
       </div>
       <span class="text-cockpit-border">|</span>
       <span class="text-xs text-cockpit-muted">
-        {{ agentCount }} agent{{ agentCount !== 1 ? 's' : '' }}
+        {{ agentCount }} 个 Agent
       </span>
     </div>
 
@@ -67,7 +67,7 @@ function onSelectTheme(mode: ThemeMode): void {
         :class="connected ? 'bg-cockpit-success' : 'bg-cockpit-danger'"
       ></span>
       <span class="text-xs text-cockpit-muted">
-        {{ connected ? 'Connected' : 'Disconnected' }}
+        {{ connected ? '已连接' : '未连接' }}
       </span>
     </div>
 
@@ -76,9 +76,9 @@ function onSelectTheme(mode: ThemeMode): void {
       <!-- Feature 3: 主题切换 -->
       <div class="relative">
         <button
-          class="px-2.5 py-1 text-xs rounded-md transition-colors"
-          :class="showThemeMenu ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
-          :title="'Theme: ' + theme.mode.value"
+          class="px-2.5 py-1 text-xs rounded-sm transition-colors duration-150"
+          :class="showThemeMenu ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-muted hover:bg-cockpit-surface-hover'"
+          :title="'主题：' + themeOptions.find(t => t.mode === theme.mode.value)?.label"
           @click="showThemeMenu = !showThemeMenu"
         >
           {{ themeOptions.find(t => t.mode === theme.mode.value)?.icon || '🎨' }}
@@ -93,7 +93,7 @@ function onSelectTheme(mode: ThemeMode): void {
             v-for="opt in themeOptions"
             :key="opt.mode"
             class="w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors"
-            :class="theme.mode.value === opt.mode ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-text hover:bg-cockpit-border/30'"
+            :class="theme.mode.value === opt.mode ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-text hover:bg-cockpit-surface-hover'"
             @click="onSelectTheme(opt.mode)"
           >
             <span>{{ opt.icon }}</span>
@@ -106,8 +106,8 @@ function onSelectTheme(mode: ThemeMode): void {
       <!-- Phase 2: IRC 面板按钮 -->
       <button
         class="relative px-2.5 py-1 text-xs rounded transition-colors"
-        :class="ircPanelOpen ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
-        title="Toggle IRC Log"
+        :class="ircPanelOpen ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-muted hover:bg-cockpit-surface-hover'"
+        title="切换 IRC 日志"
         @click="emit('toggle-irc')"
       >
         <svg class="w-3.5 h-3.5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,41 +118,41 @@ function onSelectTheme(mode: ThemeMode): void {
       <!-- Phase 3: Budget 仪表盘按钮 -->
       <button
         class="relative px-2.5 py-1 text-xs rounded transition-colors"
-        :class="budgetPanelOpen ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
-        title="Toggle Budget Dashboard"
+        :class="budgetPanelOpen ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-muted hover:bg-cockpit-surface-hover'"
+        title="切换预算仪表盘"
         @click="emit('toggle-budget')"
       >
         <span class="text-sm">💰</span>
       </button>
 
       <button
-        class="px-2.5 py-1 text-xs rounded-md bg-cockpit-accent/10 text-cockpit-accent hover:bg-cockpit-accent/20 transition-colors"
-        title="Add Agent"
+        class="px-2.5 py-1 text-xs rounded-sm bg-cockpit-accent-subtle text-cockpit-accent hover:bg-cockpit-accent/20 transition-colors duration-150"
+        title="添加 Agent"
         @click="emit('add-agent')"
       >
         + Agent
       </button>
       <button
-        class="px-2.5 py-1 text-xs rounded-md text-cockpit-muted hover:bg-cockpit-border/50 transition-colors"
-        :title="mode === 'grid' ? 'Switch to Single View' : 'Switch to Grid View'"
+        class="px-2.5 py-1 text-xs rounded-sm text-cockpit-muted hover:bg-cockpit-surface-hover transition-colors duration-150"
+        :title="mode === 'grid' ? '切换到单屏视图' : '切换到宫格视图'"
         @click="emit('toggle-mode')"
       >
-        {{ mode === 'grid' ? '⊞ Grid' : '⊟ Single' }}
+        {{ mode === 'grid' ? '⊞ 宫格' : '⊟ 单屏' }}
       </button>
       <button
         class="px-2.5 py-1 text-xs rounded transition-colors"
-        :class="rightPanelOpen ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
-        title="Toggle Preview Panel"
+        :class="rightPanelOpen ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-muted hover:bg-cockpit-surface-hover'"
+        title="切换预览面板"
         @click="emit('toggle-right-panel')"
       >
-        ☰ Preview
+        ☰ 预览
       </button>
 
       <!-- Feature 1: Settings 按钮 -->
       <button
         class="px-2.5 py-1 text-xs rounded transition-colors"
-        :class="settingsOpen ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
-        title="Settings"
+        :class="settingsOpen ? 'text-cockpit-accent bg-cockpit-accent-subtle' : 'text-cockpit-muted hover:bg-cockpit-surface-hover'"
+        title="设置"
         @click="emit('toggle-settings')"
       >
         ⚙

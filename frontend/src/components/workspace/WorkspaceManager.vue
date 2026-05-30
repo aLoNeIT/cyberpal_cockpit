@@ -9,15 +9,15 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'add-workspace', name: string, path: string): void;
+  (e: 'add-workspace', name: string, path: string, projectPaths: string[]): void;
   (e: 'remove-workspace', id: string): void;
   (e: 'select-workspace', id: string): void;
 }>();
 
 const showDialog = ref(false);
 
-function handleConfirm(name: string, path: string): void {
-  emit('add-workspace', name, path);
+function handleConfirm(name: string, mainPath: string, projectPaths: string[]): void {
+  emit('add-workspace', name, mainPath, projectPaths);
   showDialog.value = false;
 }
 </script>
@@ -26,7 +26,7 @@ function handleConfirm(name: string, path: string): void {
   <div class="p-2">
     <!-- 标题 -->
     <div class="flex items-center justify-between mb-2">
-      <span class="type-label text-cockpit-muted">Workspaces</span>
+      <span class="type-label text-cockpit-muted">工作区</span>
       <button
         class="text-xs text-cockpit-accent hover:text-cockpit-accent/80 transition-colors"
         @click="showDialog = true"
@@ -51,7 +51,7 @@ function handleConfirm(name: string, path: string): void {
         <button
           class="text-cockpit-muted hover:text-cockpit-danger opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
           @click.stop="emit('remove-workspace', ws.id)"
-          title="Remove workspace"
+          title="移除工作区"
         >
           ✕
         </button>

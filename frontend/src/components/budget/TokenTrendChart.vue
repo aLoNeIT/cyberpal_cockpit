@@ -34,7 +34,7 @@ function createChart(): void {
 
   if (props.dailyLimit !== undefined && props.dailyLimit > 0) {
     datasets.push({
-      label: 'Daily Budget',
+      label: '每日预算',
       data: Array(props.data.length).fill(props.dailyLimit),
       borderColor: '#EF4444',
       borderDash: [4, 4],

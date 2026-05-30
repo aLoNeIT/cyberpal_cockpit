@@ -34,7 +34,7 @@ export function useFilePreview() {
       };
       diffData.value = null;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load file';
+      const message = err instanceof Error ? err.message : '加载文件失败';
       error.value = message;
       console.error('[useFilePreview] Error opening file:', message);
     } finally {
@@ -59,7 +59,7 @@ export function useFilePreview() {
       };
       currentFile.value = null;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load diff';
+      const message = err instanceof Error ? err.message : '加载差异失败';
       error.value = message;
       console.error('[useFilePreview] Error loading diff:', message);
     } finally {

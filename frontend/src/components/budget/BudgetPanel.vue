@@ -131,7 +131,7 @@ function startResize(e: MouseEvent): void {
     <div class="flex items-center justify-between px-3 py-2 border-b border-cockpit-border flex-shrink-0">
       <div class="flex items-center gap-2">
         <span class="text-sm">💰</span>
-        <span class="type-label text-cockpit-text">Budget Dashboard</span>
+        <span class="type-label text-cockpit-text">预算仪表盘</span>
       </div>
       <button class="text-cockpit-muted hover:text-cockpit-text text-sm" @click="$emit('close')">✕</button>
     </div>
@@ -143,13 +143,13 @@ function startResize(e: MouseEvent): void {
           <div class="text-3xl font-bold text-cockpit-text font-mono">
             {{ totalTokens.toLocaleString() }}
           </div>
-          <div class="type-caption mt-0.5">Total Token Consumption (This Month)</div>
+          <div class="type-caption mt-0.5">本月 Token 总消耗</div>
         </div>
 
         <!-- 进度条 -->
         <div class="mb-3" v-if="!isUnlimited">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-2xs text-cockpit-muted">Budget Usage</span>
+            <span class="text-2xs text-cockpit-muted">预算使用率</span>
             <span class="text-2xs font-mono" :class="progressTextColor">
               {{ pct.toFixed(1) }}%
             </span>
@@ -163,22 +163,22 @@ function startResize(e: MouseEvent): void {
           </div>
           <div class="flex items-center justify-between mt-1">
             <span class="text-2xs text-cockpit-muted">
-              {{ limitTokens.toLocaleString() }} limit
+              {{ limitTokens.toLocaleString() }} 限额
             </span>
             <span class="text-2xs text-cockpit-muted">
-              {{ Math.max(0, limitTokens - totalTokens).toLocaleString() }} remaining
+              {{ Math.max(0, limitTokens - totalTokens).toLocaleString() }} 剩余
             </span>
           </div>
         </div>
         <div v-else class="text-center text-2xs text-cockpit-muted mb-3">
-          No budget limit set
+          未设置预算限额
         </div>
       </div>
 
       <!-- Agent 排行 -->
       <div>
         <div class="type-overline mb-2">
-          Agent Token Ranking
+          Agent Token 排行
         </div>
         <TokenBarChart :data="agentData" />
       </div>
@@ -193,7 +193,7 @@ function startResize(e: MouseEvent): void {
       <!-- 趋势图 -->
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="type-overline">Token Trend</span>
+          <span class="type-overline">Token 趋势</span>
           <div class="flex gap-1">
             <button
               class="text-2xs px-1.5 py-0.5 rounded transition-colors"
@@ -208,7 +208,7 @@ function startResize(e: MouseEvent): void {
           </div>
         </div>
         <TokenTrendChart
-          label="Token Consumption"
+          label="Token 消耗"
           :days="trendDays"
           :data="trendData"
           :daily-limit="dailyLimit"

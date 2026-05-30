@@ -26,7 +26,7 @@ function agentLabel(agentId: string): string {
     >
       <span class="w-2 h-2 rounded-full bg-cockpit-danger animate-pulse"></span>
       <span class="text-xs font-medium text-cockpit-danger">{{ conflicts.length }}</span>
-      <span class="text-xs text-cockpit-danger/70">conflict{{ conflicts.length > 1 ? 's' : '' }}</span>
+      <span class="text-xs text-cockpit-danger/70">个冲突</span>
     </div>
 
     <!-- Toast 列表 -->
@@ -36,7 +36,7 @@ function agentLabel(agentId: string): string {
         class="fixed top-28 right-4 z-50 bg-cockpit-panel border border-cockpit-border rounded-lg shadow-2xl w-80 max-h-96 overflow-y-auto"
       >
         <div class="flex items-center justify-between px-3 py-2 border-b border-cockpit-border">
-          <span class="text-xs font-semibold text-cockpit-text">Conflict Alerts</span>
+          <span class="text-xs font-semibold text-cockpit-text">冲突警告</span>
           <button
             class="text-cockpit-muted hover:text-cockpit-text text-xs"
             @click="expanded = false"
@@ -70,7 +70,7 @@ function agentLabel(agentId: string): string {
               <button
                 class="text-cockpit-muted hover:text-cockpit-text text-xs flex-shrink-0"
                 @click="emit('dismiss', c.id)"
-                title="Dismiss"
+                title="忽略"
               >
                 ✕
               </button>
@@ -79,7 +79,7 @@ function agentLabel(agentId: string): string {
         </div>
 
         <div v-if="conflicts.length > 5" class="px-3 py-2 text-2xs text-cockpit-muted text-center border-t border-cockpit-border">
-          +{{ conflicts.length - 5 }} more conflicts
+          +{{ conflicts.length - 5 }} 更多冲突
         </div>
       </div>
     </Transition>

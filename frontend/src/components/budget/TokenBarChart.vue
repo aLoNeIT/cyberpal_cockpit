@@ -22,7 +22,7 @@ function createChart(): void {
     data: {
       labels: props.data.map((d) => d.label),
       datasets: [{
-        label: 'Tokens',
+        label: 'Token',
         data: props.data.map((d) => d.value),
         backgroundColor: props.data.map((_, i) => {
           const alpha = 1 - (i / Math.max(props.data.length, 1)) * 0.6;

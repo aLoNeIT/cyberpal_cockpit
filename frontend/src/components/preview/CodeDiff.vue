@@ -81,7 +81,7 @@ const lang = computed(() => props.language || 'plaintext');
     <!-- 头部 -->
     <div class="flex items-center px-3 py-1 text-xs text-cockpit-muted border-b border-cockpit-border bg-cockpit-bg/50 font-mono flex-shrink-0">
       <span class="mr-1">Δ</span>
-      <span>Code Diff</span>
+      <span>代码差异</span>
     </div>
 
     <!-- Side-by-side 模式 -->

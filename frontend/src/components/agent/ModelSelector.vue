@@ -48,8 +48,8 @@ const emit = defineEmits<{
         <span class="text-cockpit-muted text-2xs">{{ m.provider }}</span>
         <span class="font-medium">{{ m.name }}</span>
       </div>
-      <span v-if="m.id === currentModel" class="text-cockpit-accent text-xs">✓ current</span>
-      <span v-else-if="m.isDefault" class="text-cockpit-muted text-2xs">default</span>
+      <span v-if="m.id === currentModel" class="text-cockpit-accent text-xs">✓ 当前</span>
+      <span v-else-if="m.isDefault" class="text-cockpit-muted text-2xs">默认</span>
     </div>
   </div>
 </template>

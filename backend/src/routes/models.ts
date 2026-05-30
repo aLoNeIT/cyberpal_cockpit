@@ -23,7 +23,7 @@ export function createModelRoutes(providerConfigService?: ProviderConfigService)
       const response: ApiResponse<ModelInfo[]> = { code: 0, data: models, message: 'ok' };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });

@@ -126,7 +126,7 @@ function toggleExcluded(agentId: string): void {
     <!-- Save -->
     <div class="flex items-center gap-2">
       <button
-        class="px-4 py-1.5 text-xs rounded bg-cockpit-accent text-white hover:bg-cockpit-accent/80 transition-colors disabled:opacity-50"
+        class="px-4 py-1.5 text-xs font-medium rounded-sm bg-cockpit-accent text-white hover:bg-cockpit-accent-hover transition-colors duration-150 disabled:opacity-50"
         :disabled="saving"
         @click="save"
       >

@@ -25,7 +25,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -44,7 +44,7 @@ export function createWorkspaceRoutes(
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'name and path are required',
+          message: 'name 和 path 为必填项',
         };
         res.status(400).json(response);
         return;
@@ -89,11 +89,11 @@ export function createWorkspaceRoutes(
       const response: ApiResponse<WorkspaceConfig> = {
         code: 0,
         data: workspace,
-        message: 'Workspace created',
+        message: '工作区创建成功',
       };
       res.status(201).json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -113,7 +113,7 @@ export function createWorkspaceRoutes(
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'Workspace not found',
+          message: '工作区不存在',
         };
         res.status(404).json(response);
         return;
@@ -128,11 +128,11 @@ export function createWorkspaceRoutes(
       const response: ApiResponse<null> = {
         code: 0,
         data: null,
-        message: 'Workspace deleted',
+        message: '工作区已删除',
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -153,7 +153,7 @@ export function createWorkspaceRoutes(
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'Workspace not found',
+          message: '工作区不存在',
         };
         res.status(404).json(response);
         return;
@@ -167,7 +167,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -186,7 +186,7 @@ export function createWorkspaceRoutes(
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'path query parameter is required',
+          message: 'path 查询参数为必填项',
         };
         res.status(400).json(response);
         return;
@@ -208,7 +208,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -248,7 +248,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -264,7 +264,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(500).json({ code: -1, data: null, message });
     }
   });
@@ -305,7 +305,7 @@ export function createWorkspaceRoutes(
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       res.status(400).json({ code: -1, data: null, message });
     }
   });

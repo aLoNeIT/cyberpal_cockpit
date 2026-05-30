@@ -146,9 +146,9 @@ async function onKillAgent(id: string, cascade: boolean = true): Promise<void> {
     // 获取后代数量用于确认提示
     const childrenCount = agent!.childIds.length;
     const confirmed = confirm(
-      `This agent has ${childrenCount} child agent(s).\n\n` +
-      `OK = Cascade kill (terminate all descendants)\n` +
-      `Cancel = Kill self only (children become orphaned)`
+      `该 Agent 有 ${childrenCount} 个子 Agent。\n\n` +
+      `确定 = 级联终止（终止所有后代）\n` +
+      `取消 = 仅终止自身（子 Agent 变为游离状态）`
     );
     if (!confirmed) {
       cascade = false;
@@ -209,8 +209,9 @@ function onSessionNodeClick(agentId: string): void {
 }
 
 // Feature 2: 工作区创建
-async function onAddWorkspace(name: string, path: string): Promise<void> {
+async function onAddWorkspace(name: string, path: string, _projectPaths: string[]): Promise<void> {
   await workspaces.addWorkspace(name, path);
+  // TODO: projectPaths 后续可存入工作区配置
 }
 </script>
 
@@ -304,7 +305,7 @@ async function onAddWorkspace(name: string, path: string): Promise<void> {
             :language="filePreview.currentFile.value.language"
           />
           <div v-else class="flex items-center justify-center h-full text-cockpit-muted text-sm p-4 text-center">
-            Click a file in the workspace tree to preview
+                       点击左侧工作区树中的文件即可预览
           </div>
         </RightPanel>
       </div>

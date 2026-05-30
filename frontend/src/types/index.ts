@@ -1,6 +1,6 @@
 // ============ Agent 相关类型 ============
 
-export type AgentStatus = 'running' | 'stopped' | 'error' | 'restarting';
+export type AgentStatus = 'running' | 'idle' | 'stopped' | 'error' | 'restarting';
 
 export interface AgentInfo {
   id: string;

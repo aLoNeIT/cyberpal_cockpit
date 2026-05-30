@@ -14,52 +14,52 @@ let terminal: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
 const isLight = ref(false);
 
-/** 亮色主题配置 */
+/** 亮色主题配置 — 匹配设计系统 v1.0 */
 const LIGHT_THEME = {
-  background: '#ffffff',
-  foreground: '#1a202c',
-  cursor: '#3b82f6',
-  selectionBackground: '#bfdbfe',
-  black: '#6b7280',
-  red: '#ef4444',
-  green: '#10b981',
-  yellow: '#f59e0b',
-  blue: '#3b82f6',
-  magenta: '#8b5cf6',
-  cyan: '#06b6d4',
-  white: '#9ca3af',
-  brightBlack: '#4b5563',
-  brightRed: '#f87171',
-  brightGreen: '#34d399',
-  brightYellow: '#fbbf24',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#a78bfa',
-  brightCyan: '#22d3ee',
-  brightWhite: '#f3f4f6',
+  background: '#EBEDF1',       /* color-surface-sunken */
+  foreground: '#1A202C',       /* color-text */
+  cursor: '#6366F1',           /* color-accent（Indigo 500） */
+  selectionBackground: '#E0E7FF', /* color-accent-subtle */
+  black: '#6B7C93',            /* color-text-secondary */
+  red: '#EF4444',              /* color-danger */
+  green: '#10B981',            /* color-success */
+  yellow: '#F59E0B',           /* color-warning */
+  blue: '#6366F1',             /* color-accent */
+  magenta: '#8B5CF6',
+  cyan: '#06B6D4',
+  white: '#A0AAB9',            /* color-text-placeholder */
+  brightBlack: '#4B5563',
+  brightRed: '#F87171',
+  brightGreen: '#34D399',
+  brightYellow: '#FBBF24',
+  brightBlue: '#818CF8',       /* color-accent（Indigo 400） */
+  brightMagenta: '#A78BFA',
+  brightCyan: '#22D3EE',
+  brightWhite: '#F3F4F6',
 };
 
-/** 暗色主题配置 */
+/** 暗色主题配置 — 匹配设计系统 v1.0 */
 const DARK_THEME = {
-  background: '#0d1117',
-  foreground: '#c9d1d9',
-  cursor: '#58a6ff',
-  selectionBackground: '#264f78',
-  black: '#484f58',
-  red: '#f85149',
-  green: '#3fb950',
-  yellow: '#d2991d',
-  blue: '#58a6ff',
-  magenta: '#bc8cff',
-  cyan: '#39c5cf',
-  white: '#b1bac4',
-  brightBlack: '#6e7681',
-  brightRed: '#ff7b72',
-  brightGreen: '#56d364',
-  brightYellow: '#e3b341',
-  brightBlue: '#79c0ff',
-  brightMagenta: '#d2a8ff',
-  brightCyan: '#56d4dd',
-  brightWhite: '#f0f6fc',
+  background: '#141828',       /* color-surface-sunken dark */
+  foreground: '#C9D1D9',       /* color-text dark */
+  cursor: '#818CF8',           /* color-accent dark（Indigo 400） */
+  selectionBackground: '#313959', /* color-accent-subtle dark */
+  black: '#8B949E',            /* color-text-secondary dark */
+  red: '#F87171',              /* color-danger dark */
+  green: '#34D399',            /* color-success dark */
+  yellow: '#FBBF24',           /* color-warning dark */
+  blue: '#818CF8',             /* color-accent dark */
+  magenta: '#A78BFA',
+  cyan: '#22D3EE',
+  white: '#5A6473',            /* color-text-placeholder dark */
+  brightBlack: '#6E7681',
+  brightRed: '#FF7B72',
+  brightGreen: '#56D364',
+  brightYellow: '#E3B341',
+  brightBlue: '#A5B4FC',       /* color-accent-hover dark */
+  brightMagenta: '#D2A8FF',
+  brightCyan: '#56D4DD',
+  brightWhite: '#F0F6FC',
 };
 
 function detectTheme(): boolean {
@@ -90,7 +90,7 @@ onMounted(async () => {
     cursorBlink: true,
     cursorStyle: 'bar',
     fontSize: 13,
-    fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
+    fontFamily: "'Cascadia Code Variable', 'Fira Code', 'JetBrains Mono', ui-monospace, monospace",
     theme: getXtermTheme(),
     allowProposedApi: true,
     disableStdin: true,

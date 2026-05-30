@@ -16,7 +16,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -38,7 +38,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -58,7 +58,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'cwd is required',
+          message: 'cwd 参数为必填项',
         };
         res.status(400).json(response);
         return;
@@ -71,11 +71,11 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       const response: ApiResponse<CreateAgentResponse> = {
         code: 0,
         data: { agent },
-        message: 'Agent created',
+        message: 'Agent 创建成功',
       };
       res.status(201).json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
 
       // Phase 3: 预算超限返回 429
       if (message.includes('Budget exceeded') || message.includes('预算')) {
@@ -108,11 +108,11 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       const response: ApiResponse<null> = {
         code: 0,
         data: null,
-        message: cascade ? 'Agent and descendants terminated' : 'Agent terminated (children orphaned)',
+        message: cascade ? 'Agent 及其所有后代已终止' : 'Agent 已终止（子 Agent 已变为游离态）',
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -132,7 +132,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'input is required',
+          message: 'input 参数为必填项',
         };
         res.status(400).json(response);
         return;
@@ -142,11 +142,11 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       const response: ApiResponse<null> = {
         code: 0,
         data: null,
-        message: 'Input sent',
+        message: '输入已发送',
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,
@@ -166,7 +166,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
         const response: ApiResponse<null> = {
           code: -1,
           data: null,
-          message: 'model is required',
+          message: 'model 参数为必填项',
         };
         res.status(400).json(response);
         return;
@@ -176,11 +176,11 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
       const response: ApiResponse<CreateAgentResponse> = {
         code: 0,
         data: { agent },
-        message: 'Agent restarted with new model',
+        message: 'Agent 已使用新模型重启',
       };
       res.json(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Internal error';
+      const message = err instanceof Error ? err.message : '内部错误';
       const response: ApiResponse<null> = {
         code: -1,
         data: null,

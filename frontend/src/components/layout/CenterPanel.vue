@@ -67,8 +67,8 @@ const activeAgent = computed(() => {
     >
       <div class="text-center">
         <div class="text-4xl mb-3 text-cockpit-muted">⊞</div>
-        <p class="text-cockpit-muted text-sm">No agents running</p>
-        <p class="text-cockpit-muted/60 text-xs mt-1">Click "+ Agent" in the top bar to start one</p>
+        <p class="text-cockpit-muted text-sm">暂无运行中的 Agent</p>
+        <p class="text-cockpit-muted/60 text-xs mt-1">点击顶部栏的「+ Agent」来启动一个</p>
       </div>
     </div>
   </div>

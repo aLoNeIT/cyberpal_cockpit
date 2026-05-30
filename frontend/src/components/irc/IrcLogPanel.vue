@@ -51,7 +51,7 @@ function formatTime(ts: number): string {
     <div class="flex items-center justify-between px-3 py-2 border-b border-cockpit-border flex-shrink-0">
       <div class="flex items-center gap-2">
         <span class="text-sm">💬</span>
-        <span class="type-label text-cockpit-text">IRC Log</span>
+        <span class="type-label text-cockpit-text">IRC 日志</span>
       </div>
       <button
         class="text-cockpit-muted hover:text-cockpit-text text-sm"
@@ -69,15 +69,15 @@ function formatTime(ts: number): string {
           class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
-          <option value="all">All Types</option>
-          <option value="dm">DM Only</option>
-          <option value="broadcast">Broadcast Only</option>
+          <option value="all">全部类型</option>
+          <option value="dm">仅私信</option>
+          <option value="broadcast">仅广播</option>
         </select>
         <button
           class="text-2xs px-2 py-1 rounded text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/30 transition-colors"
           @click="resetFilter"
         >
-          Reset
+          重置
         </button>
       </div>
       <div class="flex gap-1">
@@ -86,7 +86,7 @@ function formatTime(ts: number): string {
           class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
-          <option value="">All Senders</option>
+          <option value="">全部发送者</option>
           <option v-for="a in availableAgents" :key="a.id" :value="a.id">
             {{ agentLabel(a.id, availableAgents) }}
           </option>
@@ -96,7 +96,7 @@ function formatTime(ts: number): string {
           class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
-          <option value="">All Recipients</option>
+          <option value="">全部接收者</option>
           <option v-for="a in availableAgents" :key="a.id" :value="a.id">
             {{ agentLabel(a.id, availableAgents) }}
           </option>
@@ -107,7 +107,7 @@ function formatTime(ts: number): string {
     <!-- 消息列表 -->
     <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
       <div v-if="messages.length === 0" class="flex items-center justify-center h-full text-cockpit-muted text-xs text-center p-4">
-        No IRC messages yet.<br/>Agent IRC communication will appear here.
+        暂无 IRC 消息。<br/>Agent 间的 IRC 通信将显示在这里。
       </div>
 
       <div
@@ -126,7 +126,7 @@ function formatTime(ts: number): string {
               ? 'bg-cockpit-accent/20 text-cockpit-accent'
               : 'bg-cockpit-success/20 text-cockpit-success'"
           >
-            {{ msg.type === 'broadcast' ? '📢 Broadcast' : '✉ DM' }}
+            {{ msg.type === 'broadcast' ? '📢 广播' : '✉ 私信' }}
           </span>
           <span class="text-2xs text-cockpit-muted">{{ formatTime(msg.timestamp) }}</span>
         </div>
@@ -139,7 +139,7 @@ function formatTime(ts: number): string {
             <span class="text-cockpit-success font-mono">{{ agentLabel(msg.to, availableAgents) }}</span>
           </template>
           <template v-else>
-            <span class="text-cockpit-muted">→ all</span>
+            <span class="text-cockpit-muted">→ 全员</span>
           </template>
         </div>
 

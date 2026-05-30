@@ -15,7 +15,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'add-workspace', name: string, path: string): void;
+  (e: 'add-workspace', name: string, path: string, projectPaths: string[]): void;
   (e: 'remove-workspace', id: string): void;
   (e: 'select-workspace', id: string): void;
   (e: 'toggle-tree', id: string): void;
@@ -37,7 +37,7 @@ const emit = defineEmits<{
           : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/20'"
         @click="emit('tab-change', 'workspace')"
       >
-        Workspace
+        工作区
       </button>
       <button
         class="flex-1 py-2 text-xs font-medium transition-colors border-l border-cockpit-border"
@@ -46,7 +46,7 @@ const emit = defineEmits<{
           : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/20'"
         @click="emit('tab-change', 'session')"
       >
-        Sessions
+        会话
       </button>
     </div>
 
@@ -56,7 +56,7 @@ const emit = defineEmits<{
         <WorkspaceManager
           :workspaces="workspaces"
           :selected-workspace-id="selectedWorkspaceId"
-          @add-workspace="(name, path) => emit('add-workspace', name, path)"
+          @add-workspace="(name, path, projectPaths) => emit('add-workspace', name, path, projectPaths)"
           @remove-workspace="(id) => emit('remove-workspace', id)"
           @select-workspace="(id) => emit('select-workspace', id)"
         />
@@ -64,7 +64,7 @@ const emit = defineEmits<{
 
       <div class="flex-1 overflow-y-auto">
         <div v-if="!selectedWorkspaceId" class="flex items-center justify-center h-full text-cockpit-muted text-sm p-4 text-center">
-          Select or add a workspace to browse files
+          选择或添加工作区以浏览文件
         </div>
         <WorkspaceTree
           v-else-if="treeData.length > 0"
@@ -72,7 +72,7 @@ const emit = defineEmits<{
           @file-click="(path) => emit('file-click', path)"
         />
         <div v-else class="flex items-center justify-center h-full text-cockpit-muted text-sm p-4 text-center">
-          Loading directory tree...
+          正在加载目录树...
         </div>
       </div>
 
@@ -81,7 +81,7 @@ const emit = defineEmits<{
           class="w-full text-xs text-cockpit-muted hover:text-cockpit-text py-1 rounded hover:bg-cockpit-border/30 transition-colors"
           @click="emit('refresh-tree')"
         >
-          ↻ Refresh
+          ↻ 刷新
         </button>
       </div>
     </template>
@@ -90,7 +90,7 @@ const emit = defineEmits<{
     <template v-else>
       <div class="flex-1 overflow-y-auto">
         <div v-if="sessionTreeNodes.length === 0" class="flex items-center justify-center h-full text-cockpit-muted text-sm p-4 text-center">
-          No active sessions
+          暂无活跃会话
         </div>
         <SessionTree
           v-else

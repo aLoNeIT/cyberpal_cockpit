@@ -41,20 +41,20 @@ function handleConfirm(): void {
 
   if (mode.value === 'quick') {
     if (!selectedWorkspaceId.value) {
-      errorMsg.value = 'Please select a workspace';
+      errorMsg.value = '请选择一个工作区';
       return;
     }
     const ws = props.workspaces.find(
       (w) => w.id === selectedWorkspaceId.value,
     );
     if (!ws) {
-      errorMsg.value = 'Selected workspace not found';
+      errorMsg.value = '未找到选中的工作区';
       return;
     }
     emit('confirm', ws.path, ws.id, selectedModel.value);
   } else {
     if (!manualCwd.value.trim()) {
-      errorMsg.value = 'Please enter a working directory';
+      errorMsg.value = '请输入工作目录';
       return;
     }
     emit('confirm', manualCwd.value.trim(), undefined, selectedModel.value);
@@ -70,7 +70,7 @@ function handleCancel(): void {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
     <div class="bg-cockpit-panel border border-cockpit-border rounded-lg shadow-2xl w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
       <div class="flex items-center justify-between px-4 py-3 border-b border-cockpit-border">
-        <h2 class="text-base font-semibold text-cockpit-text tracking-tight">Launch Agent</h2>
+        <h2 class="text-base font-semibold text-cockpit-text tracking-tight">启动 Agent</h2>
         <button class="text-cockpit-muted hover:text-cockpit-text text-sm" @click="handleCancel">✕</button>
       </div>
 
@@ -80,21 +80,21 @@ function handleCancel(): void {
           :class="mode === 'quick' ? 'text-cockpit-accent border-b-2 border-cockpit-accent bg-cockpit-accent/5' : 'text-cockpit-muted hover:text-cockpit-text'"
           @click="mode = 'quick'"
         >
-          Quick Launch (Workspace)
+          快速启动（工作区）
         </button>
         <button
           class="flex-1 py-2.5 text-xs font-medium transition-colors"
           :class="mode === 'manual' ? 'text-cockpit-accent border-b-2 border-cockpit-accent bg-cockpit-accent/5' : 'text-cockpit-muted hover:text-cockpit-text'"
           @click="mode = 'manual'"
         >
-          Manual (Custom Path)
+          手动（自定义路径）
         </button>
       </div>
 
       <div v-if="mode === 'quick'" class="p-4">
-        <p class="text-xs text-cockpit-muted mb-3">Select a workspace to use as the agent's working directory:</p>
+        <p class="text-xs text-cockpit-muted mb-3">选择 Agent 的工作目录：</p>
         <div v-if="props.workspaces.length === 0" class="text-xs text-cockpit-muted text-center py-4">
-          No workspaces configured. Add one in the left panel first.
+          尚未配置工作区。请先在左侧面板中添加一个。
         </div>
         <div class="space-y-1">
           <div
@@ -115,11 +115,11 @@ function handleCancel(): void {
       </div>
 
       <div v-else class="p-4">
-        <p class="text-xs text-cockpit-muted mb-3">Enter the absolute path to the working directory:</p>
+        <p class="text-xs text-cockpit-muted mb-3">输入工作目录的绝对路径：</p>
         <input
           v-model="manualCwd"
           type="text"
-          placeholder="e.g., /home/user/projects/my-app"
+          placeholder="例如：/home/user/projects/my-app"
           class="w-full bg-cockpit-bg border border-cockpit-border rounded px-3 py-2 text-sm text-cockpit-text placeholder-cockpit-muted focus:outline-none focus:border-cockpit-accent font-mono"
           @keydown.enter="handleConfirm"
         />
@@ -129,7 +129,7 @@ function handleCancel(): void {
 
       <!-- Phase 3: 模型选择 -->
       <div class="px-4 pb-3">
-        <label class="text-xs text-cockpit-muted block mb-1">Model</label>
+        <label class="text-xs text-cockpit-muted block mb-1">模型</label>
         <ModelSelector
           v-if="models.length > 0"
           :models="models"
@@ -137,7 +137,7 @@ function handleCancel(): void {
           mode="dropdown"
           @select="(id) => selectedModel = id"
         />
-        <span v-else-if="modelsLoading" class="text-xs text-cockpit-muted">Loading models...</span>
+        <span v-else-if="modelsLoading" class="text-xs text-cockpit-muted">正在加载模型列表...</span>
       </div>
 
       <div class="flex justify-end gap-2 px-4 py-3 border-t border-cockpit-border">
@@ -145,13 +145,13 @@ function handleCancel(): void {
           class="px-4 py-1.5 text-xs rounded bg-cockpit-border/30 text-cockpit-text hover:bg-cockpit-border/50 transition-colors"
           @click="handleCancel"
         >
-          Cancel
+          取消
         </button>
         <button
-          class="px-4 py-1.5 text-xs rounded bg-cockpit-accent text-white hover:bg-cockpit-accent/80 transition-colors"
+          class="px-4 py-1.5 text-xs font-medium rounded-sm bg-cockpit-accent text-white hover:bg-cockpit-accent-hover transition-colors duration-150"
           @click="handleConfirm"
         >
-          Launch
+          启动
         </button>
       </div>
     </div>

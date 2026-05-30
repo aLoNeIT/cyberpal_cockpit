@@ -37,7 +37,7 @@ function displayName(agent: AgentInfo): string {
       <button
         class="ml-1 text-cockpit-muted hover:text-cockpit-danger leading-none"
         @click.stop="emit('tab-close', agent.id)"
-        title="Close agent"
+        title="关闭 Agent"
       >
         ✕
       </button>
@@ -45,7 +45,7 @@ function displayName(agent: AgentInfo): string {
 
     <!-- 无 agent 时的占位 -->
     <div v-if="agents.length === 0" class="px-3 py-1.5 text-xs text-cockpit-muted">
-      No agents
+      暂无 Agent
     </div>
   </div>
 </template>
