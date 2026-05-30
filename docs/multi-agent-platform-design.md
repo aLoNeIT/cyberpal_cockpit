@@ -1,6 +1,6 @@
 # CyberPal Cockpit（赛博帕鲁驾驶舱）— 产品设计文档
 
-> 日期：2026-05-29 | 状态：设计定稿 | 缩写：CPC
+> 日期：2026-05-29 | 状态：已实现 Phase 1-3 + 增强功能 | 缩写：CPC
 
 ---
 
@@ -47,13 +47,24 @@
 
 ### Roadmap 演进
 
-| 阶段 | 目标 |
+| 阶段 | 目标 | 状态 |
+|------|------|------|
+| Phase 1 | 多 Agent 独立工作台（N 宫格 + 各自独立） | ✅ 已交付 |
+| Phase 2 | Agent 协作（task 子代理 + irc 通信） | ✅ 已交付 |
+| Phase 3 | 成本与预算控制 | ✅ 已交付 |
+| Phase 4 | Electron 桌面壳 | 📋 待规划 |
+| Phase 5 | 团队协作平台（远期） | 📋 远期 |
+
+### 已交付增强功能
+
+| 功能 | 说明 |
 |------|------|
-| Phase 1 | 多 Agent 独立工作台（N 宫格 + 各自独立） |
-| Phase 2 | Agent 协作（task 子代理 + irc 通信） |
-| Phase 3 | 成本与预算控制 |
-| Phase 4 | Electron 桌面壳 |
-| Phase 5 | 团队协作平台（远期） |
+| 系统设置页 | ⚙ 设置弹窗，Provider / Budget / General / About 四菜单 |
+| 提供商自定义 | 支持添加/删除非内置 AI 提供商，配置 API Key 和模型 |
+| 工作区弹窗 | 名称+路径选择弹窗，含驱动器切换（多盘符支持） |
+| 主题切换 | 亮色/暗色/跟随系统三模式，CSS 变量全局覆盖 |
+| 数据库持久化 | SQLite（默认）+ MySQL，5 张核心表，自动迁移 |
+| 使用说明书 | docs/user-guide.md，含快速开始、FAQ、数据库配置 |
 
 ---
 
@@ -62,14 +73,15 @@
 | 层 | 技术 | 用途 |
 |---|------|------|
 | **前端** | Vue 3 + Vite + TypeScript | SPA 框架 |
-| | markstream-vue (2,508⭐ / 12.9k周下载) | 流式 Markdown 渲染 + Monaco 编辑器 |
+| | Tailwind CSS | 原子化样式 + CSS 变量主题 |
 | | xterm.js | Agent 终端模拟 |
-| | v-code-diff (35k/周) | 代码 Diff 对比 |
+| | monaco-editor | 代码预览编辑器 |
+| | chart.js | Token 仪表盘图表 |
 | **后端** | Node.js + Express | HTTP REST API |
 | | ws | WebSocket 实时推送 |
 | | chokidar | 文件系统监听 |
+| | better-sqlite3 / mysql2 | 数据库持久化（SQLite 默认） |
 | **Agent 引擎** | oh-my-pi + `--mode json` | 50+ 模型 / 内置 task / irc / MCP / Token 计数 |
-| **桌面壳** | Electron（Phase 4） | 窗口管理、托盘、快捷键 |
 
 ---
 
@@ -179,30 +191,30 @@ oh-my-pi 已内置的能力，Backend Service 无需自研：
 
 ## 七、MVP 分阶段计划
 
-### Phase 1：多 Agent 独立工作台
+### Phase 1：多 Agent 独立工作台 ✅ 已交付
 > 每开一个格子 → 启动一个独立的 oh-my-pi 进程，各自干活互不干涉。暂不实现 agent 间协作。
 
-- [ ] oh-my-pi 进程管理（spawn/kill/stdin/stdout）
-- [ ] Vue 3 三栏布局骨架
-- [ ] 左侧工作区目录树（工作区 ↔ 目录绑定）
-- [ ] 中间 N 宫格 Agent 终端（xterm.js + markstream-vue 渲染）
-- [ ] N 宫格 / 单屏切换 + 顶部标签栏
-- [ ] Agent ↔ 工作区目录绑定（每个 agent 启动时指定 cwd）
-- [ ] 右侧代码预览（Monaco，可关闭）
-- [ ] WebSocket 实时推流（多路复用）
-- [ ] 多 agent 并行启动与生命周期管理
+- [x] oh-my-pi 进程管理（spawn/kill/stdin/stdout）
+- [x] Vue 3 三栏布局骨架
+- [x] 左侧工作区目录树（工作区 ↔ 目录绑定）
+- [x] 中间 N 宫格 Agent 终端（xterm.js + markstream-vue 渲染）
+- [x] N 宫格 / 单屏切换 + 顶部标签栏
+- [x] Agent ↔ 工作区目录绑定（每个 agent 启动时指定 cwd）
+- [x] 右侧代码预览（Monaco，可关闭）
+- [x] WebSocket 实时推流（多路复用）
+- [x] 多 agent 并行启动与生命周期管理
 
-### Phase 2：Agent 协作
-- [ ] oh-my-pi `task` 子 agent 可视化（主控拆任务 → spawn worker）
-- [ ] `irc` agent 间通信日志与监控
-- [ ] 树形会话视图（展示 task spawn 的父子关系）
-- [ ] 文件预留冲突提示
+### Phase 2：Agent 协作 ✅ 已交付
+- [x] oh-my-pi `task` 子 agent 可视化（主控拆任务 → spawn worker）
+- [x] `irc` agent 间通信日志与监控
+- [x] 树形会话视图（展示 task spawn 的父子关系）
+- [x] 文件预留冲突提示
 
-### Phase 3：成本与预算
-- [ ] Token 用量聚合与仪表盘
-- [ ] 按 agent / 项目维度统计
-- [ ] 预算硬上限与超限通知
-- [ ] 模型切换 UI
+### Phase 3：成本与预算 ✅ 已交付
+- [x] Token 用量聚合与仪表盘
+- [x] 按 agent / 项目维度统计
+- [x] 预算硬上限与超限通知
+- [x] 模型切换 UI
 
 ### Phase 4：Electron 桌面壳
 - [ ] 托盘图标 + 全局快捷键
@@ -218,7 +230,40 @@ oh-my-pi 已内置的能力，Backend Service 无需自研：
 
 ---
 
-## 八、决策历史
+## 八、数据持久化（已实现）
+
+### 数据库支持
+
+| 数据库 | 驱动 | 默认 | 适用场景 |
+|--------|------|------|---------|
+| SQLite | better-sqlite3 | ✅ | 本地开发、单机部署 |
+| MySQL | mysql2 | — | 生产环境、多实例共享 |
+
+### Schema
+
+| 表 | 用途 |
+|----|------|
+| `workspaces` | 工作区配置持久化 |
+| `providers` / `provider_models` | AI 提供商及模型配置 |
+| `token_records` | Token 消耗记录（按 agent/日期） |
+| `agents` | Agent 运行历史审计 |
+| `settings` | 通用键值对设置存储 |
+
+### 配置
+
+```bash
+# SQLite（默认，零配置）
+# 数据库文件: ~/.cyberpal-cockpit/cpc.db
+
+# MySQL
+DB_DRIVER=mysql
+DB_MYSQL_HOST=localhost
+DB_MYSQL_DATABASE=cyberpal_cockpit
+```
+
+---
+
+## 九、决策历史
 
 | 决策点 | 选项 | 选择 | 理由 |
 |--------|------|------|------|
