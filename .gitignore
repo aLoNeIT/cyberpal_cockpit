@@ -1,0 +1,32 @@
+# Test & development artifacts
+.tmp/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Local tool caches
+.playwright-cli/
+.vite/
+.workbuddy/
