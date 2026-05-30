@@ -11,7 +11,7 @@
 
 import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import type { DatabaseInterface } from './DatabaseInterface.js';
 
 /** 迁移脚本接口 */
@@ -62,16 +62,21 @@ export class MigrationManager {
 
       for (const file of files) {
         const modulePath = join(this.migrationsDir, file);
-        const mod = await import(modulePath);
+        // Windows 兼容: import() 需要 file:// URL
+        const moduleUrl = pathToFileURL(modulePath).href;
+        const mod = await import(moduleUrl);
         const migration: Migration = {
           name: file.replace(/\.(ts|js)$/, ''),
           up: mod.default?.up || mod.up,
           down: mod.default?.down || mod.down,
         };
+        if (!migration.up) {
+          console.warn(`[Migration] Warning: ${file} has no up() export`);
+        }
         migrations.push(migration);
       }
-    } catch {
-      // migrations 目录不存在或无迁移文件，跳过
+    } catch (err) {
+      console.error('[Migration] Failed to load migration files:', err);
     }
 
     return migrations;
