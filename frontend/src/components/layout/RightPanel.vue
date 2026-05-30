@@ -17,7 +17,7 @@ const emit = defineEmits<{
   >
     <!-- 顶部标题栏 -->
     <div class="flex items-center justify-between px-3 py-1.5 border-b border-cockpit-border flex-shrink-0">
-      <span class="text-xs font-medium text-cockpit-muted uppercase tracking-wider">Preview</span>
+      <span class="type-label text-cockpit-muted">Preview</span>
       <button
         class="text-cockpit-muted hover:text-cockpit-text text-sm leading-none px-1"
         @click="emit('close')"

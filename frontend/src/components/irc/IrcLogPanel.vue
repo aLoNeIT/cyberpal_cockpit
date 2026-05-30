@@ -51,7 +51,7 @@ function formatTime(ts: number): string {
     <div class="flex items-center justify-between px-3 py-2 border-b border-cockpit-border flex-shrink-0">
       <div class="flex items-center gap-2">
         <span class="text-sm">💬</span>
-        <span class="text-xs font-semibold text-cockpit-text uppercase tracking-wider">IRC Log</span>
+        <span class="type-label text-cockpit-text">IRC Log</span>
       </div>
       <button
         class="text-cockpit-muted hover:text-cockpit-text text-sm"
@@ -66,7 +66,7 @@ function formatTime(ts: number): string {
       <div class="flex gap-1">
         <select
           v-model="filterType"
-          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-[10px] text-cockpit-text focus:outline-none focus:border-cockpit-accent"
+          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
           <option value="all">All Types</option>
@@ -74,7 +74,7 @@ function formatTime(ts: number): string {
           <option value="broadcast">Broadcast Only</option>
         </select>
         <button
-          class="text-[10px] px-2 py-1 rounded text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/30 transition-colors"
+          class="text-2xs px-2 py-1 rounded text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/30 transition-colors"
           @click="resetFilter"
         >
           Reset
@@ -83,7 +83,7 @@ function formatTime(ts: number): string {
       <div class="flex gap-1">
         <select
           v-model="filterFrom"
-          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-[10px] text-cockpit-text focus:outline-none focus:border-cockpit-accent"
+          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
           <option value="">All Senders</option>
@@ -93,7 +93,7 @@ function formatTime(ts: number): string {
         </select>
         <select
           v-model="filterTo"
-          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-[10px] text-cockpit-text focus:outline-none focus:border-cockpit-accent"
+          class="flex-1 bg-cockpit-bg border border-cockpit-border rounded px-1.5 py-1 text-2xs text-cockpit-text focus:outline-none focus:border-cockpit-accent"
           @change="applyFilter"
         >
           <option value="">All Recipients</option>
@@ -121,18 +121,18 @@ function formatTime(ts: number): string {
         <!-- 头部：类型 + 时间 -->
         <div class="flex items-center justify-between mb-0.5">
           <span
-            class="text-[10px] px-1 rounded font-medium"
+            class="text-2xs px-1 rounded font-medium"
             :class="msg.type === 'broadcast'
               ? 'bg-cockpit-accent/20 text-cockpit-accent'
               : 'bg-cockpit-success/20 text-cockpit-success'"
           >
             {{ msg.type === 'broadcast' ? '📢 Broadcast' : '✉ DM' }}
           </span>
-          <span class="text-[10px] text-cockpit-muted">{{ formatTime(msg.timestamp) }}</span>
+          <span class="text-2xs text-cockpit-muted">{{ formatTime(msg.timestamp) }}</span>
         </div>
 
         <!-- 路由信息 -->
-        <div class="flex items-center gap-1 text-[10px] mb-1">
+        <div class="flex items-center gap-1 text-2xs mb-1">
           <span class="text-cockpit-accent font-mono">{{ agentLabel(msg.from, availableAgents) }}</span>
           <template v-if="msg.to">
             <span class="text-cockpit-muted">→</span>
@@ -144,7 +144,7 @@ function formatTime(ts: number): string {
         </div>
 
         <!-- 消息内容 -->
-        <pre class="text-cockpit-text whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{{ msg.message }}</pre>
+        <pre class="text-cockpit-text whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{{ msg.message }}</pre>
       </div>
     </div>
   </div>

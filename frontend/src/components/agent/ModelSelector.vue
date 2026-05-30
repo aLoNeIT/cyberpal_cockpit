@@ -45,11 +45,11 @@ const emit = defineEmits<{
       @click="emit('select', m.id)"
     >
       <div class="flex items-center gap-2">
-        <span class="text-cockpit-muted text-[10px]">{{ m.provider }}</span>
+        <span class="text-cockpit-muted text-2xs">{{ m.provider }}</span>
         <span class="font-medium">{{ m.name }}</span>
       </div>
       <span v-if="m.id === currentModel" class="text-cockpit-accent text-xs">✓ current</span>
-      <span v-else-if="m.isDefault" class="text-cockpit-muted text-[10px]">default</span>
+      <span v-else-if="m.isDefault" class="text-cockpit-muted text-2xs">default</span>
     </div>
   </div>
 </template>

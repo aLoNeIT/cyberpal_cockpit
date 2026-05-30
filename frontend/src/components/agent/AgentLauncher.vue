@@ -70,20 +70,20 @@ function handleCancel(): void {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
     <div class="bg-cockpit-panel border border-cockpit-border rounded-lg shadow-2xl w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
       <div class="flex items-center justify-between px-4 py-3 border-b border-cockpit-border">
-        <h2 class="text-sm font-semibold text-cockpit-text">Launch Agent</h2>
+        <h2 class="text-base font-semibold text-cockpit-text tracking-tight">Launch Agent</h2>
         <button class="text-cockpit-muted hover:text-cockpit-text text-sm" @click="handleCancel">✕</button>
       </div>
 
       <div class="flex border-b border-cockpit-border">
         <button
-          class="flex-1 py-2 text-xs font-medium transition-colors"
+          class="flex-1 py-2.5 text-xs font-medium transition-colors"
           :class="mode === 'quick' ? 'text-cockpit-accent border-b-2 border-cockpit-accent bg-cockpit-accent/5' : 'text-cockpit-muted hover:text-cockpit-text'"
           @click="mode = 'quick'"
         >
           Quick Launch (Workspace)
         </button>
         <button
-          class="flex-1 py-2 text-xs font-medium transition-colors"
+          class="flex-1 py-2.5 text-xs font-medium transition-colors"
           :class="mode === 'manual' ? 'text-cockpit-accent border-b-2 border-cockpit-accent bg-cockpit-accent/5' : 'text-cockpit-muted hover:text-cockpit-text'"
           @click="mode = 'manual'"
         >
@@ -107,7 +107,7 @@ function handleCancel(): void {
             <span class="text-cockpit-muted">📁</span>
             <div class="flex-1 min-w-0">
               <div class="font-medium truncate">{{ ws.name }}</div>
-              <div class="text-cockpit-muted text-[10px] truncate">{{ ws.path }}</div>
+              <div class="text-cockpit-muted text-2xs truncate">{{ ws.path }}</div>
             </div>
             <span v-if="selectedWorkspaceId === ws.id" class="text-cockpit-accent">✓</span>
           </div>

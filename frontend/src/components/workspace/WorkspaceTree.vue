@@ -74,7 +74,7 @@ function getIcon(node: FileTreeNode): string {
           class="flex items-center gap-1 px-2 py-0.5 text-xs cursor-pointer hover:bg-cockpit-border/30 rounded transition-colors select-none"
           @click="toggleDir(node.path)"
         >
-          <span class="text-cockpit-muted text-[10px] w-3 text-center">
+          <span class="text-cockpit-muted text-2xs w-3 text-center">
             {{ isExpanded(node.path) ? '▼' : '▶' }}
           </span>
           <span>{{ getIcon(node) }}</span>
@@ -88,7 +88,7 @@ function getIcon(node: FileTreeNode): string {
             @file-click="(path) => emit('file-click', path)"
           />
         </div>
-        <div v-else-if="isExpanded(node.path) && (!node.children || node.children.length === 0)" class="ml-3 pl-7 py-0.5 text-[10px] text-cockpit-muted">
+        <div v-else-if="isExpanded(node.path) && (!node.children || node.children.length === 0)" class="ml-3 pl-7 py-0.5 text-2xs text-cockpit-muted">
           (empty)
         </div>
       </div>

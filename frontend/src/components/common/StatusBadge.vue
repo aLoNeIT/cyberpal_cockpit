@@ -34,7 +34,7 @@ const orphanedStyle = {
 <template>
   <span
     v-if="isOrphaned"
-    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-medium"
     :class="orphanedStyle.bgClass"
   >
     <span class="w-1.5 h-1.5 rounded-full" :class="orphanedStyle.dotClass"></span>
@@ -42,7 +42,7 @@ const orphanedStyle = {
   </span>
   <span
     v-else
-    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-medium"
     :class="statusMap[status].bgClass"
   >
     <span class="w-1.5 h-1.5 rounded-full" :class="statusMap[status].dotClass"></span>

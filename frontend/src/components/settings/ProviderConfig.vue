@@ -202,7 +202,7 @@ onMounted(() => {
     <!-- Provider 列表 -->
     <div class="w-56 flex-shrink-0 space-y-1">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-semibold text-cockpit-muted uppercase tracking-wider">Providers</span>
+        <span class="type-label text-cockpit-muted">Providers</span>
         <button
           class="text-xs px-2 py-0.5 rounded bg-cockpit-accent/10 text-cockpit-accent hover:bg-cockpit-accent/20 transition-colors"
           @click="showAddForm = !showAddForm"
@@ -232,7 +232,7 @@ onMounted(() => {
           class="w-full bg-cockpit-surface border border-cockpit-border rounded px-2 py-1 text-xs text-cockpit-text placeholder-cockpit-muted focus:outline-none focus:border-cockpit-accent"
           @keydown.enter="handleAddProvider"
         />
-        <p v-if="addError" class="text-[10px] text-cockpit-danger">{{ addError }}</p>
+        <p v-if="addError" class="text-2xs text-cockpit-danger">{{ addError }}</p>
         <div class="flex gap-1">
           <button
             class="flex-1 px-2 py-1 text-xs rounded bg-cockpit-accent text-white hover:bg-cockpit-accent/80 transition-colors"
@@ -262,12 +262,12 @@ onMounted(() => {
           <span class="text-base flex-shrink-0">{{ providerIcon(p.id) }}</span>
           <div class="min-w-0">
             <div class="text-xs font-medium truncate">{{ p.name }}</div>
-            <div class="text-[10px]" :class="p.configured ? 'text-cockpit-success' : 'text-cockpit-muted'">
+            <div class="text-2xs" :class="p.configured ? 'text-cockpit-success' : 'text-cockpit-muted'">
               {{ p.configured ? 'Configured' : 'Not configured' }}
             </div>
           </div>
         </div>
-        <span class="text-[10px] text-cockpit-muted flex-shrink-0 ml-1">{{ p.modelCount }}</span>
+        <span class="text-2xs text-cockpit-muted flex-shrink-0 ml-1">{{ p.modelCount }}</span>
       </button>
     </div>
 
@@ -357,7 +357,7 @@ onMounted(() => {
         <div>
           <div class="flex items-center justify-between mb-1">
             <label class="text-xs text-cockpit-muted">Models</label>
-            <span class="text-[10px] text-cockpit-muted">{{ editModels.length }} model(s)</span>
+            <span class="text-2xs text-cockpit-muted">{{ editModels.length }} model(s)</span>
           </div>
 
           <div class="space-y-1 mb-2 max-h-40 overflow-y-auto">
@@ -368,10 +368,10 @@ onMounted(() => {
             >
               <div class="flex items-center gap-2 min-w-0">
                 <span class="text-xs text-cockpit-text font-mono truncate">{{ m.id }}</span>
-                <span class="text-[10px] text-cockpit-muted truncate">{{ m.name }}</span>
+                <span class="text-2xs text-cockpit-muted truncate">{{ m.name }}</span>
                 <span
                   v-if="m.isDefault"
-                  class="text-[10px] text-cockpit-accent bg-cockpit-accent/10 px-1 rounded"
+                  class="text-2xs text-cockpit-accent bg-cockpit-accent/10 px-1 rounded"
                 >
                   default
                 </span>

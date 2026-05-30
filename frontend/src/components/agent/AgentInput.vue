@@ -27,18 +27,18 @@ function handleKeydown(e: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="border-t border-cockpit-border flex items-center gap-2 px-3 py-1.5 bg-cockpit-bg/50">
+  <div class="border-t border-cockpit-border flex items-center gap-2 px-3 py-2 bg-cockpit-bg/50">
     <input
       v-model="inputText"
       :disabled="disabled"
       type="text"
       placeholder="Type input and press Enter..."
-      class="flex-1 bg-transparent border-none outline-none text-xs text-cockpit-text placeholder-cockpit-muted font-mono"
+      class="flex-1 bg-transparent border-none outline-none text-sm text-cockpit-text placeholder-cockpit-muted font-mono"
       @keydown="handleKeydown"
     />
     <button
       :disabled="disabled || !inputText.trim()"
-      class="text-xs px-2 py-0.5 rounded bg-cockpit-accent/20 text-cockpit-accent hover:bg-cockpit-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+      class="text-xs px-3 py-1 rounded-md bg-cockpit-accent/20 text-cockpit-accent hover:bg-cockpit-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
       @click="handleSend"
     >
       Send

@@ -64,7 +64,7 @@ function toggleExcluded(agentId: string): void {
           {{ opt.label }}
         </option>
       </select>
-      <p class="text-[10px] text-cockpit-muted mt-0.5">
+      <p class="text-2xs text-cockpit-muted mt-0.5">
         {{ overrunPolicyOptions.find(o => o.value === localConfig.overrunPolicy)?.desc }}
       </p>
     </div>
@@ -83,7 +83,7 @@ function toggleExcluded(agentId: string): void {
         class="w-full accent-cockpit-accent"
         @input="localConfig.warningThreshold = Number(($event.target as HTMLInputElement).value) / 100"
       />
-      <div class="flex justify-between text-[10px] text-cockpit-muted">
+      <div class="flex justify-between text-2xs text-cockpit-muted">
         <span>50%</span>
         <span>95%</span>
       </div>
@@ -104,7 +104,7 @@ function toggleExcluded(agentId: string): void {
     <!-- Excluded Agents -->
     <div>
       <label class="text-xs font-semibold text-cockpit-text block mb-1">Excluded Agents (not counted in budget)</label>
-      <div v-if="agents.length === 0" class="text-[10px] text-cockpit-muted italic">No agents running</div>
+      <div v-if="agents.length === 0" class="text-2xs text-cockpit-muted italic">No agents running</div>
       <div v-else class="space-y-1 max-h-32 overflow-y-auto">
         <label
           v-for="a in agents"
@@ -118,7 +118,7 @@ function toggleExcluded(agentId: string): void {
             @change="toggleExcluded(a.id)"
           />
           <span class="font-mono">{{ a.id.slice(0, 8) }}</span>
-          <span class="text-cockpit-muted text-[10px] truncate">{{ a.cwd }}</span>
+          <span class="text-cockpit-muted text-2xs truncate">{{ a.cwd }}</span>
         </label>
       </div>
     </div>

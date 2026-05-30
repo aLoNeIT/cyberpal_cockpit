@@ -47,11 +47,11 @@ function onSelectTheme(mode: ThemeMode): void {
 </script>
 
 <template>
-  <header class="h-10 bg-cockpit-panel border-b border-cockpit-border flex items-center justify-between px-4 flex-shrink-0 select-none">
+  <header class="h-11 bg-cockpit-panel border-b border-cockpit-border flex items-center justify-between px-4 flex-shrink-0 select-none">
     <!-- 左侧 -->
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
-        <span class="text-cockpit-accent font-bold text-sm tracking-wide">CPC</span>
+        <span class="text-cockpit-accent font-bold text-sm tracking-tight">CPC</span>
         <span class="text-cockpit-muted text-xs hidden sm:inline">CyberPal Cockpit</span>
       </div>
       <span class="text-cockpit-border">|</span>
@@ -76,7 +76,7 @@ function onSelectTheme(mode: ThemeMode): void {
       <!-- Feature 3: 主题切换 -->
       <div class="relative">
         <button
-          class="px-2.5 py-1 text-xs rounded transition-colors"
+          class="px-2.5 py-1 text-xs rounded-md transition-colors"
           :class="showThemeMenu ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-muted hover:bg-cockpit-border/50'"
           :title="'Theme: ' + theme.mode.value"
           @click="showThemeMenu = !showThemeMenu"
@@ -86,13 +86,13 @@ function onSelectTheme(mode: ThemeMode): void {
         <!-- 主题下拉菜单 -->
         <div
           v-if="showThemeMenu"
-          class="absolute right-0 top-8 bg-cockpit-panel border border-cockpit-border rounded-lg shadow-xl py-1 z-30 min-w-[120px]"
+          class="absolute right-0 top-9 bg-cockpit-panel border border-cockpit-border rounded-lg shadow-xl py-1.5 z-30 min-w-[130px]"
           @click.stop
         >
           <button
             v-for="opt in themeOptions"
             :key="opt.mode"
-            class="w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors"
+            class="w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors"
             :class="theme.mode.value === opt.mode ? 'text-cockpit-accent bg-cockpit-accent/10' : 'text-cockpit-text hover:bg-cockpit-border/30'"
             @click="onSelectTheme(opt.mode)"
           >
@@ -126,14 +126,14 @@ function onSelectTheme(mode: ThemeMode): void {
       </button>
 
       <button
-        class="px-2.5 py-1 text-xs rounded bg-cockpit-accent/10 text-cockpit-accent hover:bg-cockpit-accent/20 transition-colors"
+        class="px-2.5 py-1 text-xs rounded-md bg-cockpit-accent/10 text-cockpit-accent hover:bg-cockpit-accent/20 transition-colors"
         title="Add Agent"
         @click="emit('add-agent')"
       >
         + Agent
       </button>
       <button
-        class="px-2.5 py-1 text-xs rounded text-cockpit-muted hover:bg-cockpit-border/50 transition-colors"
+        class="px-2.5 py-1 text-xs rounded-md text-cockpit-muted hover:bg-cockpit-border/50 transition-colors"
         :title="mode === 'grid' ? 'Switch to Single View' : 'Switch to Grid View'"
         @click="emit('toggle-mode')"
       >

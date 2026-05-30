@@ -31,7 +31,7 @@ const emit = defineEmits<{
     <!-- Phase 2: 标签切换 -->
     <div class="flex border-b border-cockpit-border flex-shrink-0">
       <button
-        class="flex-1 py-2 text-xs font-medium transition-colors"
+        class="flex-1 py-2.5 text-xs font-medium transition-colors"
         :class="leftPanelTab === 'workspace'
           ? 'text-cockpit-accent border-b-2 border-cockpit-accent bg-cockpit-accent/5'
           : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-border/20'"

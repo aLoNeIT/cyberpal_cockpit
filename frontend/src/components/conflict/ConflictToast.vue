@@ -53,7 +53,7 @@ function agentLabel(agentId: string): string {
           >
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
-                <div class="text-[10px] text-cockpit-muted font-mono truncate" :title="c.event.filePath">
+                <div class="text-2xs text-cockpit-muted font-mono truncate" :title="c.event.filePath">
                   {{ c.event.filePath.split('/').pop() || c.event.filePath }}
                 </div>
                 <div class="text-xs text-cockpit-text mt-0.5">
@@ -63,7 +63,7 @@ function agentLabel(agentId: string): string {
                   <span class="text-cockpit-danger">{{ agentLabel(c.event.agentB) }}</span>
                   <span class="text-cockpit-muted"> ({{ c.event.operationB }})</span>
                 </div>
-                <div class="text-[10px] text-cockpit-muted mt-0.5">
+                <div class="text-2xs text-cockpit-muted mt-0.5">
                   {{ new Date(c.event.detectedAt).toLocaleTimeString() }}
                 </div>
               </div>
@@ -78,7 +78,7 @@ function agentLabel(agentId: string): string {
           </div>
         </div>
 
-        <div v-if="conflicts.length > 5" class="px-3 py-2 text-[10px] text-cockpit-muted text-center border-t border-cockpit-border">
+        <div v-if="conflicts.length > 5" class="px-3 py-2 text-2xs text-cockpit-muted text-center border-t border-cockpit-border">
           +{{ conflicts.length - 5 }} more conflicts
         </div>
       </div>

@@ -164,7 +164,7 @@ onMounted(() => {
     <div class="w-[560px] bg-cockpit-panel border border-cockpit-border rounded-xl shadow-2xl overflow-hidden">
       <!-- 标题栏 -->
       <div class="flex items-center justify-between px-5 py-3 border-b border-cockpit-border">
-        <h2 class="text-sm font-semibold text-cockpit-text">Add Workspace</h2>
+        <h2 class="text-base font-semibold text-cockpit-text tracking-tight">Add Workspace</h2>
         <button
           class="text-cockpit-muted hover:text-cockpit-text transition-colors"
           @click="handleCancel"
@@ -215,7 +215,7 @@ onMounted(() => {
         <!-- 文件浏览器 -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs font-semibold text-cockpit-muted uppercase tracking-wider">File Browser</span>
+            <span class="type-label text-cockpit-muted">File Browser</span>
             <button
               class="text-xs text-cockpit-accent hover:text-cockpit-accent/80 transition-colors"
               @click="goUp"
@@ -230,7 +230,7 @@ onMounted(() => {
             <button
               v-for="drive in drives"
               :key="drive"
-              class="text-[10px] px-2 py-0.5 rounded border font-mono transition-colors"
+              class="text-2xs px-2 py-0.5 rounded border font-mono transition-colors"
               :class="currentPath.replace(/\\/g, '/').toLowerCase().startsWith(drive.replace(/\\/g, '/').toLowerCase())
                 ? 'bg-cockpit-accent/20 text-cockpit-accent border-cockpit-accent/30'
                 : 'bg-cockpit-bg text-cockpit-muted border-cockpit-border hover:text-cockpit-text hover:border-cockpit-text/30'"
@@ -241,7 +241,7 @@ onMounted(() => {
           </div>
 
           <!-- 面包屑 -->
-          <div class="flex items-center gap-1 mb-1.5 flex-wrap text-[10px]">
+          <div class="flex items-center gap-1 mb-1.5 flex-wrap text-2xs">
             <template v-for="(crumb, idx) in breadcrumbs" :key="crumb.path">
               <span v-if="idx > 0" class="text-cockpit-muted">/</span>
               <button
@@ -278,7 +278,7 @@ onMounted(() => {
               </button>
             </div>
           </div>
-          <p class="text-[10px] text-cockpit-muted mt-1">
+          <p class="text-2xs text-cockpit-muted mt-1">
             Click to select, double-click to enter directory
           </p>
         </div>

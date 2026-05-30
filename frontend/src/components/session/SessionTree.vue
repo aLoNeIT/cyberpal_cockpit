@@ -53,7 +53,7 @@ function onNodeClick(agentId: string): void {
         <!-- 折叠箭头 -->
         <span
           v-if="node.children.length > 0"
-          class="text-cockpit-muted text-[10px] w-3 text-center cursor-pointer flex-shrink-0"
+          class="text-cockpit-muted text-2xs w-3 text-center cursor-pointer flex-shrink-0"
           @click.stop="toggleCollapse(node.agentId)"
         >
           {{ isCollapsed(node.agentId) ? '▶' : '▼' }}
@@ -80,7 +80,7 @@ function onNodeClick(agentId: string): void {
         <!-- worker 数标签 -->
         <span
           v-if="node.children.length > 0"
-          class="text-[10px] text-cockpit-muted bg-cockpit-bg px-1 rounded ml-auto flex-shrink-0"
+          class="text-2xs text-cockpit-muted bg-cockpit-bg px-1 rounded ml-auto flex-shrink-0"
         >
           {{ node.children.length }}
         </span>

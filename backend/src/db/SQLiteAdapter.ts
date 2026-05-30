@@ -8,12 +8,14 @@
 import Database from 'better-sqlite3';
 import type { Database as SQLiteDatabase } from 'better-sqlite3';
 import type { DatabaseInterface, QueryResult } from './DatabaseInterface.js';
+import { ensureDbDir } from './index.js';
 
 export class SQLiteAdapter implements DatabaseInterface {
   private db: SQLiteDatabase;
   public readonly adapterName: string = 'sqlite';
 
   constructor(dbPath: string) {
+    ensureDbDir(dbPath);
     this.db = new Database(dbPath);
 
     // 启用 WAL 模式提升并发性能

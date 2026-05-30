@@ -26,7 +26,7 @@ function handleConfirm(name: string, path: string): void {
   <div class="p-2">
     <!-- 标题 -->
     <div class="flex items-center justify-between mb-2">
-      <span class="text-xs font-semibold text-cockpit-muted uppercase tracking-wider">Workspaces</span>
+      <span class="type-label text-cockpit-muted">Workspaces</span>
       <button
         class="text-xs text-cockpit-accent hover:text-cockpit-accent/80 transition-colors"
         @click="showDialog = true"
