@@ -1,0 +1,114 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: CPC
+        - generic [ref=e8]: CyberPal Cockpit
+      - generic [ref=e9]: "|"
+      - generic [ref=e10]: 0 agents
+    - generic [ref=e13]: Connected
+    - generic [ref=e14]:
+      - button "🌙" [ref=e16] [cursor=pointer]
+      - button "Toggle IRC Log" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+      - button "💰" [ref=e20] [cursor=pointer]
+      - button "+ Agent" [ref=e21] [cursor=pointer]
+      - button "⊞ Grid" [ref=e22] [cursor=pointer]
+      - button "☰ Preview" [ref=e23] [cursor=pointer]
+      - button "⚙" [active] [ref=e24] [cursor=pointer]
+  - generic [ref=e25]:
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - button "Workspace" [ref=e29] [cursor=pointer]
+        - button "Sessions" [ref=e30] [cursor=pointer]
+      - generic [ref=e33]:
+        - generic [ref=e34]: Workspaces
+        - button "+" [ref=e35] [cursor=pointer]
+      - generic [ref=e37]: Select or add a workspace to browse files
+      - button "↻ Refresh" [ref=e39] [cursor=pointer]
+    - generic [ref=e47]:
+      - generic [ref=e48]: ⊞
+      - paragraph [ref=e49]: No agents running
+      - paragraph [ref=e50]: Click "+ Agent" in the top bar to start one
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - generic [ref=e56]: Preview
+        - button "✕" [ref=e57] [cursor=pointer]
+      - generic [ref=e59]: Click a file in the workspace tree to preview
+  - generic [ref=e61]:
+    - generic [ref=e62]:
+      - generic [ref=e63]: Settings
+      - button "⚙ General" [ref=e64] [cursor=pointer]:
+        - generic [ref=e65]: ⚙
+        - generic [ref=e66]: General
+      - button "🔌 Provider" [ref=e67] [cursor=pointer]:
+        - generic [ref=e68]: 🔌
+        - generic [ref=e69]: Provider
+      - button "💰 Budget" [ref=e70] [cursor=pointer]:
+        - generic [ref=e71]: 💰
+        - generic [ref=e72]: Budget
+      - button "ℹ About" [ref=e73] [cursor=pointer]:
+        - generic [ref=e74]: ℹ
+        - generic [ref=e75]: About
+    - generic [ref=e76]:
+      - generic [ref=e77]:
+        - heading "Provider" [level=2] [ref=e78]
+        - button "✕" [ref=e79] [cursor=pointer]
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - generic [ref=e83]: Providers
+          - button "🟢 DeepSeek Not configured 2 models" [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]:
+              - generic [ref=e86]: 🟢
+              - generic [ref=e87]:
+                - generic [ref=e88]: DeepSeek
+                - generic [ref=e89]: Not configured
+            - generic [ref=e90]: 2 models
+          - button "⚫ OpenAI Not configured 2 models" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: ⚫
+              - generic [ref=e94]:
+                - generic [ref=e95]: OpenAI
+                - generic [ref=e96]: Not configured
+            - generic [ref=e97]: 2 models
+          - button "🟠 Alibaba Not configured 2 models" [ref=e98] [cursor=pointer]:
+            - generic [ref=e99]:
+              - generic [ref=e100]: 🟠
+              - generic [ref=e101]:
+                - generic [ref=e102]: Alibaba
+                - generic [ref=e103]: Not configured
+            - generic [ref=e104]: 2 models
+          - button "🟣 Anthropic Not configured 2 models" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]:
+              - generic [ref=e107]: 🟣
+              - generic [ref=e108]:
+                - generic [ref=e109]: Anthropic
+                - generic [ref=e110]: Not configured
+            - generic [ref=e111]: 2 models
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - generic [ref=e115]: Provider Name
+            - textbox [ref=e116]: deepseek
+          - generic [ref=e117]:
+            - generic [ref=e118]: API Base URL
+            - textbox "https://api.example.com" [ref=e119]
+          - generic [ref=e120]:
+            - generic [ref=e121]: API Key
+            - generic [ref=e122]:
+              - textbox "Enter API Key" [ref=e123]
+              - button "👁" [ref=e124] [cursor=pointer]
+          - generic [ref=e125]:
+            - generic [ref=e126]: Default Model
+            - combobox [ref=e127]:
+              - option "Select default model" [disabled]
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - generic [ref=e130]: Models
+              - generic [ref=e131]: 0 model(s)
+            - generic [ref=e132]:
+              - textbox "model-id" [ref=e133]
+              - textbox "Model name" [ref=e134]
+              - button "+ Add" [disabled] [ref=e135]
+          - generic [ref=e136]:
+            - button "Save" [ref=e137] [cursor=pointer]
+            - button "Reset" [ref=e138] [cursor=pointer]
