@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, provide } from 'vue';
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
 import TopBar from './TopBar.vue';
 import LeftPanel from './LeftPanel.vue';
 import CenterPanel from './CenterPanel.vue';
@@ -109,6 +109,95 @@ const usageSummary = computed(() => {
   return { inputTokens, outputTokens, cachedTokens, costUsd };
 });
 
+function handleAgentStdout(message: WSMessage): void {
+  const msg = asAgentPayload<AgentOutputPayload>(message);
+  agents.appendOutput(msg.agentId, msg.payload.data, false);
+}
+
+function handleAgentStderr(message: WSMessage): void {
+  const msg = asAgentPayload<AgentOutputPayload>(message);
+  agents.appendOutput(msg.agentId, msg.payload.data, false);
+}
+
+function handleAgentEvent(message: WSMessage): void {
+  const msg = asAgentPayload<AgentConversationEvent>(message);
+  const added = agents.appendConversationEvent(msg.payload, false);
+  if (added && msg.payload.kind === 'assistant' && msg.payload.content) {
+    agents.appendFormalOutput(msg.agentId, msg.payload.content);
+  }
+}
+
+function handleAgentStatus(message: WSMessage): void {
+  const msg = asAgentPayload<AgentStatusPayload>(message);
+  agents.updateStatus(msg.agentId, msg.payload.status);
+}
+
+function handleAgentExit(message: WSMessage): void {
+  const msg = asAgentPayload<AgentExitPayload>(message);
+  agents.updateStatus(msg.agentId, 'stopped');
+}
+
+function handleFileChanged(message: WSMessage): void {
+  const msg = asPayload<FileChangedPayload>(message);
+  if (filePreview.currentFile.value && filePreview.currentFile.value.path === msg.payload.filePath) {
+    filePreview.openFile(msg.payload.filePath);
+  }
+}
+
+function handleTaskSpawn(message: WSMessage): void {
+  const msg = asPayload<TaskSpawnPayload>(message);
+  agents.handleTaskSpawn(msg.payload);
+  ws.subscribe(msg.payload.childId);
+}
+
+function handleTaskResult(message: WSMessage): void {
+  const msg = asPayload<TaskResultPayload>(message);
+  agents.handleTaskResult(msg.payload);
+}
+
+function handleIrcDm(message: WSMessage): void {
+  const msg = asPayload<IrcDmPayload>(message);
+  ircLog.addMessage('dm', msg.payload.from, msg.payload.to, msg.payload.message);
+  agents.handleIrc({ from: msg.payload.from, to: msg.payload.to, message: msg.payload.message, type: 'dm' });
+}
+
+function handleIrcBroadcast(message: WSMessage): void {
+  const msg = asPayload<IrcBroadcastPayload>(message);
+  ircLog.addMessage('broadcast', msg.payload.from, undefined, msg.payload.message);
+  agents.handleIrc({ from: msg.payload.from, message: msg.payload.message, type: 'broadcast' });
+}
+
+function handleAgentConflict(message: WSMessage): void {
+  const msg = asPayload<ConflictEvent>(message);
+  agents.handleConflict(msg.payload);
+}
+
+function handleTokenUpdate(message: WSMessage): void {
+  const msg = asPayload<TokenUpdateEvent>(message);
+  budget.onTokenUpdate(msg.payload);
+}
+
+function handleBudgetWarning(message: WSMessage): void {
+  const msg = asPayload<BudgetStatus>(message);
+  budget.onBudgetWarning(msg.payload);
+}
+
+const wsHandlers: Array<[string, (message: WSMessage) => void]> = [
+  ['agent:stdout', handleAgentStdout],
+  ['agent:stderr', handleAgentStderr],
+  ['agent:event', handleAgentEvent],
+  ['agent:status', handleAgentStatus],
+  ['agent:exit', handleAgentExit],
+  ['file:changed', handleFileChanged],
+  ['agent:task-spawn', handleTaskSpawn],
+  ['agent:task-result', handleTaskResult],
+  ['agent:irc-dm', handleIrcDm],
+  ['agent:irc-broadcast', handleIrcBroadcast],
+  ['agent:conflict', handleAgentConflict],
+  ['agent:token-update', handleTokenUpdate],
+  ['budget:warning', handleBudgetWarning],
+];
+
 onMounted(() => {
   workspaces.loadFromStorage();
   workspaces.syncFromServer();
@@ -122,82 +211,14 @@ onMounted(() => {
     console.error('[AppLayout] Failed to load agents:', err);
   });
 
-  // Phase 1 WS 消息处理
-  ws.onMessage('agent:stdout', (message) => {
-    const msg = asAgentPayload<AgentOutputPayload>(message);
-    agents.appendOutput(msg.agentId, msg.payload.data);
-  });
-
-  ws.onMessage('agent:stderr', (message) => {
-    const msg = asAgentPayload<AgentOutputPayload>(message);
-    agents.appendOutput(msg.agentId, msg.payload.data);
-  });
-
-  ws.onMessage('agent:event', (message) => {
-    const msg = asAgentPayload<AgentConversationEvent>(message);
-    agents.appendConversationEvent(msg.payload, false);
-  });
-
-  ws.onMessage('agent:status', (message) => {
-    const msg = asAgentPayload<AgentStatusPayload>(message);
-    agents.updateStatus(msg.agentId, msg.payload.status);
-  });
-
-  ws.onMessage('agent:exit', (message) => {
-    const msg = asAgentPayload<AgentExitPayload>(message);
-    agents.updateStatus(msg.agentId, 'stopped');
-  });
-
-  ws.onMessage('file:changed', (message) => {
-    const msg = asPayload<FileChangedPayload>(message);
-    if (filePreview.currentFile.value && filePreview.currentFile.value.path === msg.payload.filePath) {
-      filePreview.openFile(msg.payload.filePath);
-    }
-  });
-
-  // Phase 2: 新增 WS 消息路由
-  ws.onMessage('agent:task-spawn', (message) => {
-    const msg = asPayload<TaskSpawnPayload>(message);
-    agents.handleTaskSpawn(msg.payload);
-    // 子 agent 也需要订阅
-    ws.subscribe(msg.payload.childId);
-  });
-
-  ws.onMessage('agent:task-result', (message) => {
-    const msg = asPayload<TaskResultPayload>(message);
-    agents.handleTaskResult(msg.payload);
-  });
-
-  ws.onMessage('agent:irc-dm', (message) => {
-    const msg = asPayload<IrcDmPayload>(message);
-    ircLog.addMessage('dm', msg.payload.from, msg.payload.to, msg.payload.message);
-    agents.handleIrc({ from: msg.payload.from, to: msg.payload.to, message: msg.payload.message, type: 'dm' });
-  });
-
-  ws.onMessage('agent:irc-broadcast', (message) => {
-    const msg = asPayload<IrcBroadcastPayload>(message);
-    ircLog.addMessage('broadcast', msg.payload.from, undefined, msg.payload.message);
-    agents.handleIrc({ from: msg.payload.from, message: msg.payload.message, type: 'broadcast' });
-  });
-
-  ws.onMessage('agent:conflict', (message) => {
-    const msg = asPayload<ConflictEvent>(message);
-    agents.handleConflict(msg.payload);
-  });
-
-  // Phase 3: 新增 WS 消息路由
-  ws.onMessage('agent:token-update', (message) => {
-    const msg = asPayload<TokenUpdateEvent>(message);
-    budget.onTokenUpdate(msg.payload);
-  });
-
-  ws.onMessage('budget:warning', (message) => {
-    const msg = asPayload<BudgetStatus>(message);
-    budget.onBudgetWarning(msg.payload);
-  });
+  wsHandlers.forEach(([type, handler]) => ws.onMessage(type, handler));
 
   // Phase 3: 初始化预算数据
   budget.init();
+});
+
+onUnmounted(() => {
+  wsHandlers.forEach(([type, handler]) => ws.offMessage(type, handler));
 });
 
 // 事件处理

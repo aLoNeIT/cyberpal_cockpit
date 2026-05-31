@@ -153,31 +153,41 @@ export function useAgents() {
     return computed(() => agents.value.get(id));
   }
 
-  function appendOutput(id: string, data: string): void {
+  function appendOutput(id: string, data: string, updateMarkdown: boolean = true): void {
     const current = terminalOutputs.value.get(id) || '';
     terminalOutputs.value.set(id, current + data);
 
+    if (!updateMarkdown) return;
     const mdCurrent = markdownOutputs.value.get(id) || '';
     markdownOutputs.value.set(id, mdCurrent + data);
   }
 
-  function appendConversationEvent(event: AgentConversationEvent, updateTextOutputs: boolean = true): void {
+  function appendFormalOutput(id: string, data: string): void {
+    const mdCurrent = markdownOutputs.value.get(id) || '';
+    markdownOutputs.value.set(id, mdCurrent + data);
+  }
+
+  function appendConversationEvent(event: AgentConversationEvent, updateTextOutputs: boolean = true): boolean {
     const current = conversationEvents.value.get(event.agentId) || [];
-    if (!current.some((item) => item.id === event.id)) {
-      conversationEvents.value.set(event.agentId, [...current, event]);
+    if (current.some((item) => item.id === event.id)) {
+      return false;
     }
 
-    if (!updateTextOutputs) return;
+    conversationEvents.value.set(event.agentId, [...current, event]);
+    if (!updateTextOutputs) return true;
+
     if (event.kind === 'assistant' && event.content) {
       appendOutput(event.agentId, event.content);
     } else if (event.kind === 'stderr' && event.content) {
-      appendOutput(event.agentId, `\n${event.content}`);
+      appendOutput(event.agentId, `\n${event.content}`, false);
     }
+
+    return true;
   }
 
   function rebuildOutputsFromEvents(agentId: string, events: AgentConversationEvent[]): void {
     const terminal = events.map(formatEventForTerminal).filter(Boolean).join('');
-    const markdown = events.map(formatEventForMarkdown).filter(Boolean).join('');
+    const markdown = events.map(formatEventForFormalMarkdown).filter(Boolean).join('');
     terminalOutputs.value.set(agentId, terminal);
     markdownOutputs.value.set(agentId, markdown);
   }
@@ -214,6 +224,16 @@ export function useAgents() {
         return `\n\n**总结**：${event.content}\n`;
       default:
         return event.content ? `\n\n**${event.title || event.kind}**：${event.content}\n` : '';
+    }
+  }
+
+  function formatEventForFormalMarkdown(event: AgentConversationEvent): string {
+    switch (event.kind) {
+      case 'user':
+      case 'assistant':
+        return formatEventForMarkdown(event);
+      default:
+        return '';
     }
   }
 
@@ -409,6 +429,7 @@ export function useAgents() {
     sendStdin,
     getAgent,
     appendOutput,
+    appendFormalOutput,
     appendConversationEvent,
     updateStatus,
     clearOutput,

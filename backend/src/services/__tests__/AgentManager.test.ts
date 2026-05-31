@@ -521,6 +521,52 @@ describe('AgentManager', () => {
       );
     });
 
+    it('should not emit a duplicate summary when turn_end repeats the assistant answer', () => {
+      const eventCallback = vi.fn();
+      manager.onProcessEvent = eventCallback;
+      manager.spawn('/test/cwd');
+
+      const frames = [
+        { type: 'turn_start' },
+        { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Final answer' } },
+        { type: 'turn_end', message: { content: 'Final answer' } },
+      ].map((frame) => JSON.stringify(frame)).join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(frames));
+
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'assistant', content: 'Final answer' }),
+      );
+      expect(eventCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'summary', content: 'Final answer' }),
+      );
+    });
+
+    it('should emit turn_end message content as assistant output when no assistant deltas arrived', () => {
+      const eventCallback = vi.fn();
+      manager.onProcessEvent = eventCallback;
+      manager.spawn('/test/cwd');
+
+      const frames = [
+        { type: 'turn_start' },
+        { type: 'turn_end', message: { content: 'Final answer from turn end' } },
+      ].map((frame) => JSON.stringify(frame)).join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(frames));
+
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'mock-agent-uuid-001',
+          kind: 'assistant',
+          content: 'Final answer from turn end',
+          status: 'completed',
+        }),
+      );
+      expect(eventCallback).not.toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'summary', content: 'Final answer from turn end' }),
+      );
+    });
+
     it('should capture session metadata from RPC get_state responses', () => {
       manager.spawn('/test/cwd');
 

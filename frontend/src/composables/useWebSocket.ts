@@ -27,6 +27,10 @@ export function useWebSocket() {
     client.on(type, handler as MessageHandler);
   }
 
+  function offMessage(type: string, handler: (message: WSMessage) => void): void {
+    client.off(type, handler as MessageHandler);
+  }
+
   function send(message: Partial<WSMessage> & { type: string }): void {
     client.send(message);
   }
@@ -49,6 +53,7 @@ export function useWebSocket() {
     connect,
     disconnect,
     onMessage,
+    offMessage,
     send,
     subscribe,
     unsubscribe,

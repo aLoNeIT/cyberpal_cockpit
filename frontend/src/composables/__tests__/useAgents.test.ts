@@ -178,6 +178,69 @@ describe('useAgents', () => {
 
       expect(conversationEvents.value.get('agent-1')).toEqual([event]);
     });
+
+    it('should not append duplicate event text to terminal or formal markdown outputs', () => {
+      const { appendConversationEvent, conversationEvents, terminalOutputs, markdownOutputs } = useAgents();
+      const event = {
+        id: 'evt-1',
+        agentId: 'agent-1',
+        kind: 'assistant' as const,
+        title: 'Assistant',
+        content: 'Only once',
+        status: 'running' as const,
+        createdAt: 1,
+      };
+
+      appendConversationEvent(event);
+      appendConversationEvent(event);
+
+      expect(conversationEvents.value.get('agent-1')).toEqual([event]);
+      expect(terminalOutputs.value.get('agent-1')).toBe('Only once');
+      expect(markdownOutputs.value.get('agent-1')).toBe('Only once');
+    });
+
+    it('should rebuild formal markdown from assistant content without thinking or tool details', () => {
+      (mockApi.fetchAgents as ReturnType<typeof vi.fn>).mockResolvedValue([
+        mockAgentInfo({ id: 'agent-1', cwd: '/persisted' }),
+      ]);
+      (mockApi.fetchAgentEvents as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: 'evt-1',
+          agentId: 'agent-1',
+          kind: 'thinking',
+          title: 'Thinking',
+          content: 'Private analysis',
+          status: 'completed',
+          createdAt: 1,
+        },
+        {
+          id: 'evt-2',
+          agentId: 'agent-1',
+          kind: 'tool',
+          title: 'shell_command',
+          content: 'npm test',
+          status: 'completed',
+          createdAt: 2,
+        },
+        {
+          id: 'evt-3',
+          agentId: 'agent-1',
+          kind: 'assistant',
+          title: 'Assistant',
+          content: 'Formal answer',
+          status: 'completed',
+          createdAt: 3,
+        },
+      ]);
+
+      const { loadAgents, terminalOutputs, markdownOutputs } = useAgents();
+
+      return loadAgents().then(() => {
+        expect(terminalOutputs.value.get('agent-1')).toContain('Private analysis');
+        expect(terminalOutputs.value.get('agent-1')).toContain('npm test');
+        expect(markdownOutputs.value.get('agent-1')).toBe('Formal answer');
+      });
+    });
   });
 
   // ============ killAgent ============

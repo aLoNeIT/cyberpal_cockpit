@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { AgentConversationEvent } from '@/types';
 
 const props = defineProps<{
   events: AgentConversationEvent[];
 }>();
 
-const displayEvents = computed(() => {
+const detailsExpanded = ref(false);
+
+const mergedEvents = computed(() => {
   const merged: AgentConversationEvent[] = [];
 
   for (const event of props.events) {
@@ -27,6 +29,38 @@ const displayEvents = computed(() => {
 
   return merged;
 });
+
+const hasFormalOutput = computed(() => mergedEvents.value.some((event) => event.kind === 'assistant'));
+
+function isDetailEvent(event: AgentConversationEvent): boolean {
+  return !['user', 'assistant'].includes(event.kind);
+}
+
+const detailEvents = computed(() => {
+  if (!hasFormalOutput.value) return [];
+  return mergedEvents.value.filter(isDetailEvent);
+});
+
+const formalOutput = computed(() => {
+  return mergedEvents.value
+    .filter((event) => event.kind === 'assistant')
+    .map((event) => event.content)
+    .join('');
+});
+
+const displayEvents = computed(() => {
+  if (hasFormalOutput.value) {
+    return mergedEvents.value.filter((event) => {
+      if (event.kind === 'assistant') return false;
+      return detailsExpanded.value || event.kind === 'user';
+    });
+  }
+  return mergedEvents.value;
+});
+
+function toggleDetails(): void {
+  detailsExpanded.value = !detailsExpanded.value;
+}
 
 function canMerge(previous: AgentConversationEvent | undefined, next: AgentConversationEvent): previous is AgentConversationEvent {
   if (!previous) return false;
@@ -64,9 +98,21 @@ function markerClass(event: AgentConversationEvent): string {
 <template>
   <div class="h-full overflow-y-auto bg-cockpit-surface-sunken/50">
     <div class="mx-auto w-full max-w-5xl px-6 py-4 sm:px-8 lg:px-10 space-y-3">
-      <div v-if="displayEvents.length === 0" class="text-cockpit-muted text-sm text-center py-8">
+      <div v-if="mergedEvents.length === 0" class="text-cockpit-muted text-sm text-center py-8">
         等待 Agent 输出...
       </div>
+
+      <button
+        v-if="detailEvents.length > 0"
+        type="button"
+        data-testid="process-details-toggle"
+        class="inline-flex items-center gap-1 rounded-sm border border-cockpit-border bg-cockpit-panel px-2 py-1 text-xs text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover transition-colors duration-150"
+        :aria-expanded="detailsExpanded"
+        @click="toggleDetails"
+      >
+        <span>{{ detailsExpanded ? '▾' : '▸' }}</span>
+        <span>过程详情</span>
+      </button>
 
       <article
         v-for="event in displayEvents"
@@ -98,6 +144,17 @@ function markerClass(event: AgentConversationEvent): string {
             class="whitespace-pre-wrap break-words font-mono text-xs leading-5"
           >{{ event.content }}</pre>
           <p v-else class="whitespace-pre-wrap break-words">{{ event.content }}</p>
+        </div>
+      </article>
+
+      <article
+        v-if="hasFormalOutput"
+        data-testid="formal-output"
+        class="flex gap-3 justify-start"
+      >
+        <span class="mt-2 h-2 w-2 rounded-full flex-shrink-0 bg-cockpit-muted"></span>
+        <div class="max-w-[82%] rounded-md border px-3 py-2 text-sm leading-6 bg-cockpit-panel border-cockpit-border text-cockpit-text">
+          <p class="whitespace-pre-wrap break-words">{{ formalOutput }}</p>
         </div>
       </article>
     </div>

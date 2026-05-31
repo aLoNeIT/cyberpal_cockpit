@@ -73,6 +73,7 @@ export class AgentManager {
   private recordedUsageKeys: Set<string> = new Set();
   private stdoutLineCarry: Map<string, string> = new Map();
   private busyAgents: Set<string> = new Set();
+  private assistantOutputByAgent: Map<string, string> = new Map();
 
   // Phase 3: 注入外部依赖
   private tokenTracker: TokenTracker | null = null;
@@ -630,7 +631,7 @@ export class AgentManager {
       case 'agent_end':
       case 'turn_end':
         this.busyAgents.delete(agentId);
-        this.emitProcessEvent(agentId, 'summary', 'Summary', this.extractTurnSummary(parsed), 'completed');
+        this.emitTurnSummary(agentId, parsed);
         return;
 
       case 'message_update': {
@@ -644,6 +645,8 @@ export class AgentManager {
           return;
         }
         if (assistantEvent.type === 'text_delta' && typeof assistantEvent.delta === 'string') {
+          const current = this.assistantOutputByAgent.get(agentId) ?? '';
+          this.assistantOutputByAgent.set(agentId, current + assistantEvent.delta);
           this.emitProcessEvent(agentId, 'assistant', 'Assistant', assistantEvent.delta, 'running');
         }
         return;
@@ -690,6 +693,20 @@ export class AgentManager {
       return (message as { content: string }).content;
     }
     return 'Turn completed.';
+  }
+
+  private emitTurnSummary(agentId: string, parsed: JsonlLine): void {
+    const summary = this.extractTurnSummary(parsed);
+    const assistantOutput = this.assistantOutputByAgent.get(agentId) ?? '';
+    this.assistantOutputByAgent.delete(agentId);
+    if (!summary) return;
+    if (!assistantOutput && summary !== 'Turn completed.') {
+      this.emitProcessEvent(agentId, 'assistant', 'Assistant', summary, 'completed');
+      return;
+    }
+    if (summary !== assistantOutput) {
+      this.emitProcessEvent(agentId, 'summary', 'Summary', summary, 'completed');
+    }
   }
 
   private stringifyToolPayload(payload: unknown): string {
@@ -752,6 +769,7 @@ export class AgentManager {
   private clearRecordedUsage(agentId: string): void {
     this.stdoutLineCarry.delete(agentId);
     this.busyAgents.delete(agentId);
+    this.assistantOutputByAgent.delete(agentId);
     for (const key of this.recordedUsageKeys) {
       if (key.startsWith(`${agentId}:`)) {
         this.recordedUsageKeys.delete(key);
