@@ -101,11 +101,52 @@ describe('useBudget', () => {
       const byWs = getByWorkspace(new Map());
       expect(byWs.get('unknown')).toBe(50);
     });
+
+    it('should use workspaceId from token update events before fallback maps', () => {
+      const { onTokenUpdate, getByWorkspace } = useBudget();
+      const fallbackMap = new Map<string, string>([
+        ['agent-a', 'fallback-workspace'],
+      ]);
+
+      onTokenUpdate({
+        agentId: 'agent-a',
+        workspaceId: 'event-workspace',
+        inputTokens: 10,
+        outputTokens: 5,
+        cumulativeTokens: 100,
+        model: 'm1',
+      });
+
+      const byWs = getByWorkspace(fallbackMap);
+      expect(byWs.get('event-workspace')).toBe(100);
+      expect(byWs.has('fallback-workspace')).toBe(false);
+    });
   });
 
   // ============ onTokenUpdate ============
 
   describe('onTokenUpdate', () => {
+    it('should keep cache and cost fields from token update events', () => {
+      const { onTokenUpdate, tokenRecords } = useBudget();
+
+      onTokenUpdate({
+        agentId: 'agent-1',
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 25,
+        cumulativeTokens: 175,
+        costUsd: 0.012345,
+        model: 'gpt-4o',
+      });
+
+      expect(tokenRecords.value.get('agent-1')).toMatchObject({
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 25,
+        costUsd: 0.012345,
+      });
+    });
+
     it('should update budgetStatus percentage', () => {
       const { onTokenUpdate, budgetStatus } = useBudget();
 

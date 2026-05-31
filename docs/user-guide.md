@@ -24,7 +24,7 @@ CyberPal Cockpit 是一个多 Agent 协同开发平台，基于 oh-my-pi 框架�
 
 - **Node.js**：18.0 或更高版本
 - **包管理器**：npm（随 Node.js 一起安装）
-- **oh-my-pi**：需要预先安装并配置 oh-my-pi 命令行工具
+- **Agent 引擎**：oh-my-pi 已作为后端 npm 依赖集成，执行 `npm install` 即可安装；用户无需单独安装全局 `oh-my-pi` 命令
 - **操作系统**：Windows、macOS 或 Linux
 
 ---
@@ -49,6 +49,8 @@ npm install
 cd ../frontend
 npm install
 ```
+
+> 后端依赖会安装 `bun` 与 `@oh-my-pi/pi-coding-agent`，CPC 默认通过项目内 Bun 运行时（Windows 为 `backend/node_modules/bun/bin/bun.exe`，其他平台为 `backend/node_modules/.bin/bun`）运行项目内的 `@oh-my-pi/pi-coding-agent/src/cli.ts`。仅在调试自定义引擎时才需要设置 `OH_MY_PI_PATH` 覆盖默认路径。
 
 ### 3.3 启动后端
 
@@ -273,9 +275,10 @@ PORT=3002 npm run dev
 ### Q: Agent 无法启动？
 
 A: 请检查以下事项：
-1. 确保 `oh-my-pi` 已正确安装，在命令行中可执行
+1. 确保已在 `backend` 目录执行 `npm install`，并且项目内 Bun 运行时（Windows 为 `backend/node_modules/bun/bin/bun.exe`，其他平台为 `backend/node_modules/.bin/bun`）和 `backend/node_modules/@oh-my-pi/pi-coding-agent/src/cli.ts` 存在
 2. 确保工作区路径有效且具有读写权限
-3. 查看后端控制台输出的错误信息
+3. 如需使用自定义 Agent 引擎，可设置 `OH_MY_PI_PATH` 指向对应可执行文件；普通用户不需要配置
+4. 查看后端控制台输出的错误信息
 
 ### Q: WebSocket 连接断开？
 

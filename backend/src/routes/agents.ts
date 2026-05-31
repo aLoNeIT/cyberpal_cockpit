@@ -1,14 +1,26 @@
 import { Router, Request, Response } from 'express';
 import type { AgentManager } from '../services/AgentManager.js';
-import type { ApiResponse, CreateAgentRequest, CreateAgentResponse, StdinRequest, AgentInfo, RestartAgentRequest } from '../types/index.js';
+import type { AgentEventRepository } from '../db/repositories/AgentEventRepository.js';
+import type { AgentRecord, AgentRepository } from '../db/repositories/AgentRepository.js';
+import type { ApiResponse, CreateAgentRequest, CreateAgentResponse, StdinRequest, AgentInfo, RestartAgentRequest, AgentEventsResponse, SendStdinResponse } from '../types/index.js';
 
-export function createAgentRoutes(agentManager: AgentManager): Router {
+export function createAgentRoutes(
+  agentManager: AgentManager,
+  agentEventRepo?: AgentEventRepository,
+  agentRepo?: Pick<AgentRepository, 'findRecentAgentInfo' | 'findById'>,
+): Router {
   const router = Router();
 
   // GET /api/agents — 获取所有 Agent 状态
-  router.get('/agents', (_req: Request, res: Response) => {
+  router.get('/agents', async (_req: Request, res: Response) => {
     try {
-      const agents: AgentInfo[] = agentManager.getAllAgents();
+      const liveAgents: AgentInfo[] = agentManager.getAllAgents();
+      const historicalAgents = agentRepo ? await agentRepo.findRecentAgentInfo(100) : [];
+      const liveIds = new Set(liveAgents.map((agent) => agent.id));
+      const agents = [
+        ...liveAgents,
+        ...historicalAgents.filter((agent) => !liveIds.has(agent.id)),
+      ];
       const response: ApiResponse<AgentInfo[]> = {
         code: 0,
         data: agents,
@@ -45,6 +57,30 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
         message,
       };
       res.status(404).json(response);
+    }
+  });
+
+  // GET /api/agents/:id/events — 获取持久化会话过程事件
+  router.get('/agents/:id/events', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const rawLimit = Number(req.query.limit ?? 500);
+      const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 2000)) : 500;
+      const events = agentEventRepo ? await agentEventRepo.findByAgent(id, limit) : [];
+      const response: ApiResponse<AgentEventsResponse> = {
+        code: 0,
+        data: { events },
+        message: 'ok',
+      };
+      res.json(response);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '内部错误';
+      const response: ApiResponse<null> = {
+        code: -1,
+        data: null,
+        message,
+      };
+      res.status(500).json(response);
     }
   });
 
@@ -123,7 +159,7 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
   });
 
   // POST /api/agents/:id/stdin — 向 Agent 发送输入
-  router.post('/agents/:id/stdin', (req: Request, res: Response) => {
+  router.post('/agents/:id/stdin', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { input }: StdinRequest = req.body;
@@ -138,11 +174,20 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
         return;
       }
 
-      agentManager.sendStdin(id, input);
-      const response: ApiResponse<null> = {
+      let resumedAgent: AgentInfo | undefined;
+      if (agentManager.getAgent(id)) {
+        agentManager.sendStdin(id, input);
+      } else {
+        const persisted = agentRepo ? await agentRepo.findById(id) : undefined;
+        if (!persisted) {
+          throw new Error(`Agent ${id} not found`);
+        }
+        resumedAgent = agentManager.resume(agentRecordToInfo(persisted), input);
+      }
+      const response: ApiResponse<SendStdinResponse | null> = {
         code: 0,
-        data: null,
-        message: '输入已发送',
+        data: resumedAgent ? { agent: resumedAgent } : null,
+        message: resumedAgent ? '会话已恢复，输入已发送' : '输入已发送',
       };
       res.json(response);
     } catch (err: unknown) {
@@ -191,4 +236,22 @@ export function createAgentRoutes(agentManager: AgentManager): Router {
   });
 
   return router;
+}
+
+function agentRecordToInfo(row: AgentRecord): AgentInfo {
+  return {
+    id: row.id,
+    cwd: row.cwd,
+    status: row.status === 'running' ? 'stopped' : row.status as AgentInfo['status'],
+    pid: null,
+    workspaceId: row.workspace_id,
+    createdAt: row.created_at,
+    parentId: row.parent_id,
+    childIds: [],
+    taskDescription: row.task_description ?? undefined,
+    isOrphaned: false,
+    model: row.model ?? undefined,
+    sessionFile: row.session_file ?? undefined,
+    sessionId: row.session_id ?? undefined,
+  };
 }

@@ -5,6 +5,7 @@ import type { AgentInfo, CreateAgentResponse } from '@/types';
 // Mock API — all definitions must be inline because vi.mock is hoisted
 vi.mock('@/services/api', () => ({
   fetchAgents: vi.fn(),
+  fetchAgentEvents: vi.fn(),
   createAgent: vi.fn(),
   deleteAgent: vi.fn(),
   sendStdin: vi.fn(),
@@ -83,6 +84,22 @@ describe('useAgents', () => {
       expect(agentList.value).toHaveLength(2);
       expect(agentList.value.map((a) => a.id)).toEqual(['agent-1', 'agent-2']);
     });
+
+    it('should expose create errors for visible launcher feedback', async () => {
+      const error = {
+        response: {
+          data: {
+            message: 'Budget exceeded: 100 / 100 tokens used',
+          },
+        },
+      };
+      (mockApi.createAgent as ReturnType<typeof vi.fn>).mockRejectedValue(error);
+
+      const { createAgent, launchError } = useAgents();
+
+      await expect(createAgent('/budget-blocked')).rejects.toBe(error);
+      expect(launchError.value).toBe('Budget exceeded: 100 / 100 tokens used');
+    });
   });
 
   // ============ agentList computed ============
@@ -101,6 +118,65 @@ describe('useAgents', () => {
 
       expect(agentList.value).toHaveLength(1);
       expect(agentList.value[0].id).toBe('agent-test-1');
+    });
+  });
+
+  // ============ loadAgents / persisted events ============
+
+  describe('loadAgents', () => {
+    it('should load agents and rebuild outputs from persisted conversation events', async () => {
+      (mockApi.fetchAgents as ReturnType<typeof vi.fn>).mockResolvedValue([
+        mockAgentInfo({ id: 'agent-1', cwd: '/persisted' }),
+      ]);
+      (mockApi.fetchAgentEvents as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: 'evt-1',
+          agentId: 'agent-1',
+          kind: 'user',
+          title: 'User',
+          content: 'Say ok',
+          status: 'completed',
+          createdAt: 1,
+        },
+        {
+          id: 'evt-2',
+          agentId: 'agent-1',
+          kind: 'assistant',
+          title: 'Assistant',
+          content: 'OK',
+          status: 'completed',
+          createdAt: 2,
+        },
+      ]);
+
+      const { loadAgents, agents, conversationEvents, terminalOutputs, markdownOutputs } = useAgents();
+
+      await loadAgents();
+
+      expect(agents.value.has('agent-1')).toBe(true);
+      expect(mockApi.fetchAgentEvents).toHaveBeenCalledWith('agent-1');
+      expect(conversationEvents.value.get('agent-1')).toHaveLength(2);
+      expect(terminalOutputs.value.get('agent-1')).toContain('> Say ok');
+      expect(terminalOutputs.value.get('agent-1')).toContain('OK');
+      expect(markdownOutputs.value.get('agent-1')).toContain('> Say ok');
+    });
+
+    it('should append a websocket conversation event without duplicating existing event ids', () => {
+      const { appendConversationEvent, conversationEvents } = useAgents();
+      const event = {
+        id: 'evt-1',
+        agentId: 'agent-1',
+        kind: 'working' as const,
+        title: 'Working',
+        content: 'Agent is processing the request.',
+        status: 'running' as const,
+        createdAt: 1,
+      };
+
+      appendConversationEvent(event);
+      appendConversationEvent(event);
+
+      expect(conversationEvents.value.get('agent-1')).toEqual([event]);
     });
   });
 
@@ -135,18 +211,93 @@ describe('useAgents', () => {
       expect(mockApi.sendStdin).toHaveBeenCalledWith('agent-1', 'test input');
     });
 
+    it('should immediately append user input to cell outputs before the API resolves', async () => {
+      let resolveSend: (() => void) | undefined;
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
+      );
+
+      const { agents, terminalOutputs, markdownOutputs, sendStdin } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      terminalOutputs.value.set('agent-1', '');
+      markdownOutputs.value.set('agent-1', '');
+
+      sendStdin('agent-1', 'Build the feature');
+
+      expect(terminalOutputs.value.get('agent-1')).toBe('\r\n> Build the feature\r\n');
+      expect(markdownOutputs.value.get('agent-1')).toBe('\n> Build the feature\n\n');
+
+      resolveSend?.();
+      await vi.waitFor(() => {
+        expect(mockApi.sendStdin).toHaveBeenCalledWith('agent-1', 'Build the feature');
+      });
+    });
+
+    it('should keep user input before streamed agent output', () => {
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      const { agents, terminalOutputs, markdownOutputs, sendStdin, appendOutput } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      terminalOutputs.value.set('agent-1', '');
+      markdownOutputs.value.set('agent-1', '');
+
+      sendStdin('agent-1', 'Say ok');
+      appendOutput('agent-1', 'O');
+      appendOutput('agent-1', 'K');
+
+      expect(terminalOutputs.value.get('agent-1')).toBe('\r\n> Say ok\r\nOK');
+      expect(markdownOutputs.value.get('agent-1')).toBe('\n> Say ok\n\nOK');
+    });
+
     it('should handle API sendStdin errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Send failed'));
 
-      const { sendStdin } = useAgents();
+      const { agents, terminalOutputs, markdownOutputs, sendStdin } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      terminalOutputs.value.set('agent-1', '');
+      markdownOutputs.value.set('agent-1', '');
+
       expect(() => sendStdin('agent-1', 'input')).not.toThrow();
 
       await vi.waitFor(() => {
         expect(consoleSpy).toHaveBeenCalled();
       });
 
+      expect(terminalOutputs.value.get('agent-1')).toContain('[发送失败] Send failed');
+      expect(markdownOutputs.value.get('agent-1')).toContain('发送失败：Send failed');
+
       consoleSpy.mockRestore();
+    });
+
+    it('should update a persisted stopped agent when sendStdin resumes it', async () => {
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockResolvedValue({
+        agent: mockAgentInfo({
+          id: 'agent-1',
+          status: 'running',
+          pid: 456,
+          sessionFile: 'E:\\sessions\\old.jsonl',
+          sessionId: 'session-old',
+        }),
+      });
+
+      const { agents, terminalOutputs, markdownOutputs, sendStdin } = useAgents();
+      agents.value.set('agent-1', mockAgentInfo({ id: 'agent-1', status: 'stopped', pid: null }));
+      terminalOutputs.value.set('agent-1', '');
+      markdownOutputs.value.set('agent-1', '');
+
+      sendStdin('agent-1', 'continue');
+
+      await vi.waitFor(() => {
+        expect(agents.value.get('agent-1')).toMatchObject({
+          status: 'running',
+          pid: 456,
+          sessionFile: 'E:\\sessions\\old.jsonl',
+          sessionId: 'session-old',
+        });
+      });
     });
   });
 

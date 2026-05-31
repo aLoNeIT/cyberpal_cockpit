@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AgentCell from './AgentCell.vue';
-import type { AgentInfo } from '@/types';
+import type { AgentConversationEvent, AgentInfo } from '@/types';
 
 const props = defineProps<{
   agents: AgentInfo[];
   terminalOutputs: Map<string, string>;
   markdownOutputs: Map<string, string>;
+  conversationEvents: Map<string, AgentConversationEvent[]>;
 }>();
 
 const emit = defineEmits<{
@@ -37,6 +38,7 @@ const columnCount = computed(() => {
         :agent="agent"
         :terminal-output="terminalOutputs.get(agent.id) || ''"
         :markdown-output="markdownOutputs.get(agent.id) || ''"
+        :conversation-events="conversationEvents.get(agent.id) || []"
         @send-input="(input) => emit('send-input', agent.id, input)"
         @kill="emit('kill-agent', agent.id)"
       />

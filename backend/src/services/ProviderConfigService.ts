@@ -4,6 +4,7 @@ import type {
   ProviderModel,
   ProviderSummary,
   ProviderDetail,
+  ProviderModelRuntimeConfig,
 } from '../types/index.js';
 import type { ProviderRepository } from '../db/repositories/ProviderRepository.js';
 
@@ -58,6 +59,15 @@ function maskApiKey(key: string): string {
   const suffix = key.slice(-4);
   const middle = '*'.repeat(Math.min(key.length - 8, 16));
   return `${prefix}${middle}${suffix}`;
+}
+
+function isMaskedApiKeyPlaceholder(key: string): boolean {
+  return /\*{2,}/.test(key.trim());
+}
+
+function hasUsableApiKey(key: string): boolean {
+  const trimmed = key.trim();
+  return trimmed.length > 0 && !isMaskedApiKeyPlaceholder(trimmed);
 }
 
 export class ProviderConfigService {
@@ -120,7 +130,7 @@ export class ProviderConfigService {
       summaries.push({
         id,
         name: cfg.name,
-        configured: !!cfg.apiKey && cfg.apiKey.length > 0,
+        configured: hasUsableApiKey(cfg.apiKey),
         modelCount: cfg.models.length,
       });
     }
@@ -158,6 +168,37 @@ export class ProviderConfigService {
       }
     }
     return models;
+  }
+
+  getModelRuntimeConfig(modelSelector: string): ProviderModelRuntimeConfig | null {
+    const selector = modelSelector.trim();
+    if (!selector) return null;
+
+    const explicitSeparator = selector.indexOf('/');
+    const explicitProviderId = explicitSeparator > 0 ? selector.slice(0, explicitSeparator) : null;
+    const modelId = explicitSeparator > 0 ? selector.slice(explicitSeparator + 1) : selector;
+    if (!modelId) return null;
+
+    for (const [providerId, cfg] of this.configCache) {
+      if (explicitProviderId && providerId.toLowerCase() !== explicitProviderId.toLowerCase()) {
+        continue;
+      }
+
+      const model = cfg.models.find((m) => m.id.toLowerCase() === modelId.toLowerCase());
+      if (!model || !hasUsableApiKey(cfg.apiKey) || !cfg.baseUrl.trim()) {
+        continue;
+      }
+
+      return {
+        providerId,
+        providerName: cfg.name,
+        baseUrl: cfg.baseUrl,
+        apiKey: cfg.apiKey,
+        model: { ...model },
+      };
+    }
+
+    return null;
   }
 
   /** 添加新 provider */
@@ -201,13 +242,21 @@ export class ProviderConfigService {
     const cfg = this.configCache.get(id);
     if (!cfg) return null;
 
+    const repoUpdates = { ...updates };
+
     if (updates.name !== undefined) cfg.name = updates.name;
     if (updates.baseUrl !== undefined) cfg.baseUrl = updates.baseUrl;
-    if (updates.apiKey !== undefined) cfg.apiKey = updates.apiKey;
+    if (updates.apiKey !== undefined) {
+      if (isMaskedApiKeyPlaceholder(updates.apiKey)) {
+        delete repoUpdates.apiKey;
+      } else {
+        cfg.apiKey = updates.apiKey;
+      }
+    }
     if (updates.models !== undefined) cfg.models = updates.models;
 
     try {
-      await this.providerRepo.update(id, updates);
+      await this.providerRepo.update(id, repoUpdates);
     } catch {
       // 忽略
     }

@@ -141,6 +141,35 @@ describe('useLayout', () => {
       setActiveAgent('agent-123');
       expect(activeAgentId.value).toBe('agent-123');
     });
+
+    it('should keep an existing active agent when it is still present', () => {
+      const { activeAgentId, setActiveAgent, ensureActiveAgent } = useLayout();
+      setActiveAgent('agent-2');
+
+      const selected = ensureActiveAgent(['agent-1', 'agent-2']);
+
+      expect(selected).toBe('agent-2');
+      expect(activeAgentId.value).toBe('agent-2');
+    });
+
+    it('should select the first agent when active agent is missing', () => {
+      const { activeAgentId, ensureActiveAgent } = useLayout();
+
+      const selected = ensureActiveAgent(['agent-1', 'agent-2']);
+
+      expect(selected).toBe('agent-1');
+      expect(activeAgentId.value).toBe('agent-1');
+    });
+
+    it('should clear active agent when there are no agents', () => {
+      const { activeAgentId, setActiveAgent, ensureActiveAgent } = useLayout();
+      setActiveAgent('agent-1');
+
+      const selected = ensureActiveAgent([]);
+
+      expect(selected).toBeNull();
+      expect(activeAgentId.value).toBeNull();
+    });
   });
 
   // ============ leftWidth ============

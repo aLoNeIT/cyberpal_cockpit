@@ -18,6 +18,8 @@ export interface AgentRecord {
   parent_id: string | null;
   task_description: string | null;
   model: string | null;
+  session_file: string | null;
+  session_id: string | null;
   created_at: number;
 }
 
@@ -60,11 +62,70 @@ export class AgentRepository {
     );
   }
 
+  async findRecentAgentInfo(limit: number = 50): Promise<AgentInfo[]> {
+    const rows = await this.findRecent(limit);
+    const childRows = await this.db.query<{ parent_id: string; id: string }>(
+      'SELECT parent_id, id FROM agents WHERE parent_id IS NOT NULL'
+    );
+    const childMap = new Map<string, string[]>();
+    for (const row of childRows) {
+      const current = childMap.get(row.parent_id) || [];
+      current.push(row.id);
+      childMap.set(row.parent_id, current);
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      cwd: row.cwd,
+      status: row.status === 'running' ? 'stopped' : row.status as AgentInfo['status'],
+      pid: null,
+      workspaceId: row.workspace_id,
+      createdAt: row.created_at,
+      parentId: row.parent_id,
+      childIds: childMap.get(row.id) || [],
+      taskDescription: row.task_description ?? undefined,
+      isOrphaned: false,
+      model: row.model ?? undefined,
+      sessionFile: row.session_file ?? undefined,
+      sessionId: row.session_id ?? undefined,
+    }));
+  }
+
   /** 插入 agent 记录 */
   async insert(agent: AgentInfo): Promise<void> {
+    const existing = await this.findById(agent.id);
+    if (existing) {
+      await this.db.execute(
+        `UPDATE agents SET
+           cwd = ?,
+           status = ?,
+           pid = ?,
+           workspace_id = ?,
+           parent_id = ?,
+           task_description = ?,
+           model = ?,
+           session_file = ?,
+           session_id = ?
+         WHERE id = ?`,
+        [
+          agent.cwd,
+          agent.status,
+          agent.pid,
+          agent.workspaceId,
+          agent.parentId,
+          agent.taskDescription ?? null,
+          agent.model ?? null,
+          agent.sessionFile ?? null,
+          agent.sessionId ?? null,
+          agent.id,
+        ]
+      );
+      return;
+    }
+
     await this.db.execute(
-      `INSERT INTO agents (id, cwd, status, pid, workspace_id, parent_id, task_description, model, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO agents (id, cwd, status, pid, workspace_id, parent_id, task_description, model, session_file, session_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         agent.id,
         agent.cwd,
@@ -74,8 +135,17 @@ export class AgentRepository {
         agent.parentId,
         agent.taskDescription ?? null,
         agent.model ?? null,
+        agent.sessionFile ?? null,
+        agent.sessionId ?? null,
         agent.createdAt,
       ]
+    );
+  }
+
+  async updateSession(id: string, sessionFile?: string, sessionId?: string): Promise<void> {
+    await this.db.execute(
+      'UPDATE agents SET session_file = ?, session_id = ? WHERE id = ?',
+      [sessionFile ?? null, sessionId ?? null, id],
     );
   }
 

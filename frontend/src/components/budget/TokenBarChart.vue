@@ -40,7 +40,7 @@ function createChart(): void {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.parsed.x.toLocaleString()} tokens`,
+            label: (ctx) => `${(ctx.parsed.x ?? 0).toLocaleString()} tokens`,
           },
         },
       },

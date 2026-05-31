@@ -1,28 +1,87 @@
 import { spawn, ChildProcess } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { CONFIG } from '../config.js';
-import type { AgentInfo, AgentProcessInfo, AgentStatus } from '../types/index.js';
+import type { AgentConversationEvent, AgentInfo, AgentProcessInfo, AgentStatus } from '../types/index.js';
 import type { TokenTracker } from './TokenTracker.js';
 import type { BudgetController } from './BudgetController.js';
+import type { ProviderConfigService } from './ProviderConfigService.js';
+import { prepareOmpRuntimeConfig } from '../utils/ompRuntimeConfig.js';
 
 interface JsonlLine {
   type: string;
+  command?: string;
+  success?: boolean;
+  data?: {
+    sessionFile?: string;
+    sessionId?: string;
+    contextUsage?: {
+      tokens?: number | null;
+      contextWindow?: number;
+      percent?: number | null;
+    };
+  };
   name?: string;
   arguments?: Record<string, unknown>;
+  toolName?: string;
+  toolCallId?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  partialResult?: unknown;
+  isError?: boolean;
   token_usage?: { input?: number; output?: number };
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+  assistantMessageEvent?: {
+    type?: string;
+    delta?: string;
+    thinking?: string;
+    partial?: RpcAssistantMessage;
+    message?: RpcAssistantMessage;
+  };
+  message?: RpcAssistantMessage;
+  messages?: RpcAssistantMessage[];
   [key: string]: unknown;
+}
+
+interface RpcUsage {
+  input?: number;
+  output?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  cache_read?: number;
+  cache_write?: number;
+  cost?: {
+    input?: number;
+    output?: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+    cache_read?: number;
+    cache_write?: number;
+    total?: number;
+  };
+}
+
+interface RpcAssistantMessage {
+  responseId?: string;
+  usage?: RpcUsage;
 }
 
 export class AgentManager {
   private agents: Map<string, AgentProcessInfo> = new Map();
   private maxAgents: number;
+  private recordedUsageKeys: Set<string> = new Set();
+  private stdoutLineCarry: Map<string, string> = new Map();
+  private busyAgents: Set<string> = new Set();
 
   // Phase 3: 注入外部依赖
   private tokenTracker: TokenTracker | null = null;
   private budgetController: BudgetController | null = null;
+  private providerConfigService: Pick<ProviderConfigService, 'getModelRuntimeConfig'> | null = null;
 
   public onOutput: ((agentId: string, stream: 'stdout' | 'stderr', data: string) => void) | null = null;
+  public onProcessEvent: ((event: AgentConversationEvent) => void) | null = null;
+  public onSessionMetadata: ((agentId: string, sessionFile?: string, sessionId?: string) => void) | null = null;
   public onStatusChange: ((agentId: string, status: string, pid?: number) => void) | null = null;
   public onExit: ((agentId: string, code: number | null, signal: string | null) => void) | null = null;
   public onTaskSpawn: ((parentId: string, childId: string, taskDescription: string, cwd: string) => void) | null = null;
@@ -36,9 +95,14 @@ export class AgentManager {
   }
 
   /** Phase 3: 注入 TokenTracker 和 BudgetController */
-  injectDependencies(tokenTracker: TokenTracker, budgetController: BudgetController): void {
+  injectDependencies(
+    tokenTracker: TokenTracker,
+    budgetController: BudgetController,
+    providerConfigService?: Pick<ProviderConfigService, 'getModelRuntimeConfig'>,
+  ): void {
     this.tokenTracker = tokenTracker;
     this.budgetController = budgetController;
+    this.providerConfigService = providerConfigService ?? null;
   }
 
   /**
@@ -66,29 +130,92 @@ export class AgentManager {
     }
 
     const id = uuidv4();
-    const args = ['--mode', 'json'];
-    if (model) {
-      args.push('--model', model);
+    return this.spawnWithOptions({ id, cwd, workspaceId, parentId, taskDescription, model });
+  }
+
+  resume(agent: AgentInfo, input?: string): AgentInfo {
+    if (!agent.sessionFile) {
+      throw new Error(`Agent ${agent.id} has no session file to resume`);
+    }
+    if (this.agents.has(agent.id)) {
+      if (input !== undefined) {
+        this.sendStdin(agent.id, input);
+      }
+      return this.getAgent(agent.id)!;
+    }
+    const resumed = this.spawnWithOptions({
+      id: agent.id,
+      cwd: agent.cwd,
+      workspaceId: agent.workspaceId ?? undefined,
+      parentId: agent.parentId ?? undefined,
+      taskDescription: agent.taskDescription,
+      model: agent.model,
+      createdAt: agent.createdAt,
+      childIds: agent.childIds,
+      isOrphaned: agent.isOrphaned,
+      sessionFile: agent.sessionFile,
+      sessionId: agent.sessionId,
+    });
+    if (input !== undefined) {
+      this.sendStdin(agent.id, input);
+    }
+    return resumed;
+  }
+
+  private spawnWithOptions(options: {
+    id: string;
+    cwd: string;
+    workspaceId?: string;
+    parentId?: string;
+    taskDescription?: string;
+    model?: string;
+    createdAt?: number;
+    childIds?: string[];
+    isOrphaned?: boolean;
+    sessionFile?: string;
+    sessionId?: string;
+  }): AgentInfo {
+    const { id, cwd, workspaceId, parentId, taskDescription, model, sessionFile, sessionId } = options;
+    if (!this.agents.has(id) && this.agents.size >= this.maxAgents) {
+      throw new Error(`Maximum agent count (${this.maxAgents}) reached`);
     }
 
-    const process: ChildProcess = spawn(CONFIG.ohMyPiPath, args, { cwd });
+    const args = [...CONFIG.ohMyPiArgsPrefix, '--mode', 'rpc'];
+    if (sessionFile) {
+      args.push('--resume', sessionFile);
+    }
+    const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
+    if (model) {
+      const runtimeConfig = this.providerConfigService?.getModelRuntimeConfig(model);
+      if (runtimeConfig) {
+        const prepared = prepareOmpRuntimeConfig(CONFIG.ohMyPiAgentDir, runtimeConfig);
+        spawnEnv.PI_CODING_AGENT_DIR = prepared.agentDir;
+        args.push('--model', prepared.modelSelector);
+      } else {
+        args.push('--model', model);
+      }
+    }
+
+    const childProcess: ChildProcess = spawn(CONFIG.ohMyPiPath, args, model ? { cwd, env: spawnEnv } : { cwd });
 
     const agentInfo: AgentProcessInfo = {
       id,
       cwd,
       status: 'running',
-      pid: process.pid ?? null,
+      pid: childProcess.pid ?? null,
       workspaceId: workspaceId ?? null,
-      process,
-      createdAt: Date.now(),
+      process: childProcess,
+      createdAt: options.createdAt ?? Date.now(),
       stdoutBuffer: [],
       stderrBuffer: [],
       parentId: parentId ?? null,
-      childIds: [],
+      childIds: options.childIds ? [...options.childIds] : [],
       taskDescription,
-      isOrphaned: false,
+      isOrphaned: options.isOrphaned ?? false,
       fileOperations: [],
       model: model,
+      sessionFile,
+      sessionId,
     };
 
     this.agents.set(id, agentInfo);
@@ -100,32 +227,32 @@ export class AgentManager {
       }
     }
 
-    process.stdout?.on('data', (chunk: Buffer) => {
+    childProcess.stdout?.on('data', (chunk: Buffer) => {
       const data = chunk.toString();
       agentInfo.stdoutBuffer.push(data);
       if (agentInfo.stdoutBuffer.length > 1000) {
         agentInfo.stdoutBuffer.shift();
       }
-      this.onOutput?.(id, 'stdout', data);
-      this.parseJSONLLines(id, data);
+      this.handleStdoutData(id, data);
     });
 
-    process.stderr?.on('data', (chunk: Buffer) => {
+    childProcess.stderr?.on('data', (chunk: Buffer) => {
       const data = chunk.toString();
       agentInfo.stderrBuffer.push(data);
       if (agentInfo.stderrBuffer.length > 1000) {
         agentInfo.stderrBuffer.shift();
       }
       this.onOutput?.(id, 'stderr', data);
+      this.emitProcessEvent(id, 'stderr', 'stderr', data, 'completed');
     });
 
-    process.on('error', (err: Error) => {
+    childProcess.on('error', (err: Error) => {
       agentInfo.status = 'error';
       agentInfo.stderrBuffer.push(err.message);
       this.onStatusChange?.(id, 'error', agentInfo.pid ?? undefined);
     });
 
-    process.on('exit', (code: number | null, signal: string | null) => {
+    childProcess.on('exit', (code: number | null, signal: string | null) => {
       agentInfo.status = 'stopped';
       agentInfo.process = null;
 
@@ -158,6 +285,8 @@ export class AgentManager {
       taskDescription: agentInfo.taskDescription,
       isOrphaned: agentInfo.isOrphaned,
       model: agentInfo.model,
+      sessionFile: agentInfo.sessionFile,
+      sessionId: agentInfo.sessionId,
     };
   }
 
@@ -199,6 +328,7 @@ export class AgentManager {
       for (const descId of descendants) {
         this.killSingle(descId);
         this.tokenTracker?.flushAgent(descId);
+        this.clearRecordedUsage(descId);
       }
     } else {
       for (const childId of agent.childIds) {
@@ -208,6 +338,7 @@ export class AgentManager {
 
     this.killSingle(id);
     this.tokenTracker?.flushAgent(id);
+    this.clearRecordedUsage(id);
 
     if (agent.parentId) {
       const parent = this.agents.get(agent.parentId);
@@ -221,7 +352,10 @@ export class AgentManager {
     const agent = this.agents.get(id);
     if (!agent) throw new Error(`Agent ${id} not found`);
     if (!agent.process || !agent.process.stdin) throw new Error(`Agent ${id} stdin is not available`);
-    agent.process.stdin.write(input + '\n');
+    const commandType = this.busyAgents.has(id) ? 'follow_up' : 'prompt';
+    this.emitProcessEvent(id, 'user', 'User', input, 'completed');
+    this.busyAgents.add(id);
+    agent.process.stdin.write(`${JSON.stringify({ type: commandType, message: input })}\n`);
   }
 
   getAgent(id: string): AgentInfo | undefined {
@@ -258,6 +392,8 @@ export class AgentManager {
       taskDescription: agent.taskDescription,
       isOrphaned: agent.isOrphaned,
       model: agent.model,
+      sessionFile: agent.sessionFile,
+      sessionId: agent.sessionId,
     };
   }
 
@@ -317,19 +453,65 @@ export class AgentManager {
     if (agent && agent.status === 'stopped') {
       this.onConflictDetected?.(id, '', 'cleanup');
       this.agents.delete(id);
+      this.clearRecordedUsage(id);
     }
   }
 
-  private parseJSONLLines(agentId: string, data: string): void {
-    const lines = data.split('\n').filter((line) => line.trim().length > 0);
+  private handleStdoutData(agentId: string, data: string): void {
+    const combined = `${this.stdoutLineCarry.get(agentId) ?? ''}${data}`;
+    const parts = combined.split('\n');
+    const hasTrailingNewline = combined.endsWith('\n');
+    const rawLines = hasTrailingNewline ? parts.slice(0, -1) : parts.slice(0, -1);
+    this.stdoutLineCarry.set(agentId, hasTrailingNewline ? '' : parts[parts.length - 1]);
+
+    const lines = rawLines.filter((line) => line.trim().length > 0);
+    const plainLines: string[] = [];
     for (const line of lines) {
       try {
         const parsed: JsonlLine = JSON.parse(line);
         // Phase 3: 提取 token_usage（在任何 JSONL 事件类型下都检查）
         this.extractTokenUsage(agentId, parsed);
+        this.captureSessionMetadata(agentId, parsed);
+        this.requestSessionStateOnReady(agentId, parsed);
+        this.handleRpcProcessEvent(agentId, parsed);
         this.handleJsonlLine(agentId, parsed);
-      } catch { /* 非 JSON 行静默丢弃 */ }
+
+        const displayText = this.extractRpcDisplayText(parsed);
+        if (displayText !== null) {
+          this.onOutput?.(agentId, 'stdout', displayText);
+        } else if (!this.isKnownRpcEvent(parsed)) {
+          plainLines.push(line);
+        }
+      } catch {
+        plainLines.push(line);
+      }
     }
+
+    if (plainLines.length > 0) {
+      this.onOutput?.(agentId, 'stdout', `${plainLines.join('\n')}${hasTrailingNewline ? '\n' : ''}`);
+    }
+  }
+
+  private captureSessionMetadata(agentId: string, parsed: JsonlLine): void {
+    if (parsed.type !== 'response' || parsed.command !== 'get_state' || parsed.success !== true || !parsed.data) {
+      return;
+    }
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+    if (typeof parsed.data.sessionFile === 'string') {
+      agent.sessionFile = parsed.data.sessionFile;
+    }
+    if (typeof parsed.data.sessionId === 'string') {
+      agent.sessionId = parsed.data.sessionId;
+    }
+    this.onSessionMetadata?.(agentId, agent.sessionFile, agent.sessionId);
+  }
+
+  private requestSessionStateOnReady(agentId: string, parsed: JsonlLine): void {
+    if (parsed.type !== 'ready') return;
+    const agent = this.agents.get(agentId);
+    if (!agent?.process?.stdin) return;
+    agent.process.stdin.write(`${JSON.stringify({ type: 'get_state' })}\n`);
   }
 
   /**
@@ -351,10 +533,229 @@ export class AgentManager {
       inputTokens = parsed.usage.prompt_tokens ?? 0;
       outputTokens = parsed.usage.completion_tokens ?? 0;
     }
+    const rpcUsage = this.extractRpcUsage(parsed);
+    if (inputTokens === 0 && outputTokens === 0 && rpcUsage) {
+      inputTokens = rpcUsage.inputTokens;
+      outputTokens = rpcUsage.outputTokens;
+      const usageKey = rpcUsage.responseId
+        ? `${agentId}:${rpcUsage.responseId}`
+        : `${agentId}:${parsed.type}:${inputTokens}:${outputTokens}`;
+      if (this.recordedUsageKeys.has(usageKey)) {
+        return;
+      }
+      this.recordedUsageKeys.add(usageKey);
+    }
 
-    if (inputTokens > 0 || outputTokens > 0) {
+    const hasUsageDetails = Boolean(
+      rpcUsage && (
+        rpcUsage.details.cacheReadTokens > 0 ||
+        rpcUsage.details.cacheWriteTokens > 0 ||
+        rpcUsage.details.costUsd > 0
+      )
+    );
+
+    if (inputTokens > 0 || outputTokens > 0 || hasUsageDetails) {
       const agent = this.agents.get(agentId);
-      this.tokenTracker.recordUsage(agentId, inputTokens, outputTokens, agent?.model);
+      const details = hasUsageDetails ? rpcUsage?.details : undefined;
+      if (agent?.workspaceId) {
+        if (details) {
+          this.tokenTracker.recordUsage(agentId, inputTokens, outputTokens, agent.model, agent.workspaceId, details);
+        } else {
+          this.tokenTracker.recordUsage(agentId, inputTokens, outputTokens, agent.model, agent.workspaceId);
+        }
+      } else {
+        if (details) {
+          this.tokenTracker.recordUsage(agentId, inputTokens, outputTokens, agent?.model, undefined, details);
+        } else {
+          this.tokenTracker.recordUsage(agentId, inputTokens, outputTokens, agent?.model);
+        }
+      }
+    }
+  }
+
+  private extractRpcUsage(parsed: JsonlLine): {
+    inputTokens: number;
+    outputTokens: number;
+    responseId?: string;
+    details: { cacheReadTokens: number; cacheWriteTokens: number; costUsd: number };
+  } | null {
+    const messages = [
+      parsed.message,
+      parsed.assistantMessageEvent?.message,
+      parsed.assistantMessageEvent?.partial,
+      ...(parsed.messages ?? []),
+    ].filter((message): message is RpcAssistantMessage => Boolean(message?.usage));
+
+    for (const message of messages) {
+      const usage = message.usage;
+      if (!usage) continue;
+      const inputTokens = usage.input ?? usage.prompt_tokens ?? 0;
+      const outputTokens = usage.output ?? usage.completion_tokens ?? 0;
+      const cacheReadTokens = usage.cacheRead ?? usage.cache_read ?? 0;
+      const cacheWriteTokens = usage.cacheWrite ?? usage.cache_write ?? 0;
+      const costUsd = usage.cost?.total ?? 0;
+      if (inputTokens > 0 || outputTokens > 0 || cacheReadTokens > 0 || cacheWriteTokens > 0 || costUsd > 0) {
+        return {
+          inputTokens,
+          outputTokens,
+          responseId: message.responseId,
+          details: { cacheReadTokens, cacheWriteTokens, costUsd },
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private extractRpcDisplayText(parsed: JsonlLine): string | null {
+    if (
+      parsed.type === 'message_update' &&
+      parsed.assistantMessageEvent?.type === 'text_delta' &&
+      typeof parsed.assistantMessageEvent.delta === 'string'
+    ) {
+      return parsed.assistantMessageEvent.delta;
+    }
+
+    return null;
+  }
+
+  private handleRpcProcessEvent(agentId: string, parsed: JsonlLine): void {
+    switch (parsed.type) {
+      case 'agent_start':
+      case 'turn_start':
+        this.busyAgents.add(agentId);
+        this.emitProcessEvent(agentId, 'working', 'Working', 'Agent is processing the request.', 'running');
+        return;
+
+      case 'agent_end':
+      case 'turn_end':
+        this.busyAgents.delete(agentId);
+        this.emitProcessEvent(agentId, 'summary', 'Summary', this.extractTurnSummary(parsed), 'completed');
+        return;
+
+      case 'message_update': {
+        const assistantEvent = parsed.assistantMessageEvent;
+        if (!assistantEvent) return;
+        if (assistantEvent.type === 'thinking_delta') {
+          const content = assistantEvent.delta ?? assistantEvent.thinking ?? '';
+          if (content) {
+            this.emitProcessEvent(agentId, 'thinking', 'Thinking', content, 'running');
+          }
+          return;
+        }
+        if (assistantEvent.type === 'text_delta' && typeof assistantEvent.delta === 'string') {
+          this.emitProcessEvent(agentId, 'assistant', 'Assistant', assistantEvent.delta, 'running');
+        }
+        return;
+      }
+
+      case 'tool_execution_start':
+        this.emitProcessEvent(
+          agentId,
+          'tool',
+          parsed.toolName ?? 'Tool',
+          this.stringifyToolPayload(parsed.args),
+          'running',
+          { toolCallId: parsed.toolCallId, args: parsed.args },
+        );
+        return;
+
+      case 'tool_execution_update':
+        this.emitProcessEvent(
+          agentId,
+          'tool',
+          parsed.toolName ?? 'Tool update',
+          this.stringifyToolPayload(parsed.partialResult),
+          'running',
+          { toolCallId: parsed.toolCallId, args: parsed.args, partialResult: parsed.partialResult },
+        );
+        return;
+
+      case 'tool_execution_end':
+        this.emitProcessEvent(
+          agentId,
+          'tool',
+          parsed.toolName ?? 'Tool',
+          this.stringifyToolPayload(parsed.result),
+          parsed.isError ? 'error' : 'completed',
+          { toolCallId: parsed.toolCallId, result: parsed.result },
+        );
+        return;
+    }
+  }
+
+  private extractTurnSummary(parsed: JsonlLine): string {
+    const message = parsed.message;
+    if (message && typeof (message as { content?: unknown }).content === 'string') {
+      return (message as { content: string }).content;
+    }
+    return 'Turn completed.';
+  }
+
+  private stringifyToolPayload(payload: unknown): string {
+    if (payload === undefined || payload === null) return '';
+    if (typeof payload === 'string') return payload;
+    if (typeof payload === 'object' && 'command' in payload && typeof (payload as { command?: unknown }).command === 'string') {
+      return (payload as { command: string }).command;
+    }
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return String(payload);
+    }
+  }
+
+  private emitProcessEvent(
+    agentId: string,
+    kind: AgentConversationEvent['kind'],
+    title: string,
+    content: string,
+    status: AgentConversationEvent['status'] = 'completed',
+    metadata?: Record<string, unknown>,
+  ): void {
+    this.onProcessEvent?.({
+      id: uuidv4(),
+      agentId,
+      kind,
+      title,
+      content,
+      status,
+      metadata,
+      createdAt: Date.now(),
+    });
+  }
+
+  private isKnownRpcEvent(parsed: JsonlLine): boolean {
+    return [
+      'ready',
+      'response',
+      'agent_start',
+      'tool_use',
+      'tool_execution_start',
+      'tool_execution_update',
+      'tool_execution_end',
+      'tool_result',
+      'turn_start',
+      'message_start',
+      'message_update',
+      'message_end',
+      'turn_end',
+      'agent_end',
+      'extension_ui_request',
+      'session',
+      'model_change',
+      'thinking_level_change',
+      'message',
+    ].includes(parsed.type);
+  }
+
+  private clearRecordedUsage(agentId: string): void {
+    this.stdoutLineCarry.delete(agentId);
+    this.busyAgents.delete(agentId);
+    for (const key of this.recordedUsageKeys) {
+      if (key.startsWith(`${agentId}:`)) {
+        this.recordedUsageKeys.delete(key);
+      }
     }
   }
 

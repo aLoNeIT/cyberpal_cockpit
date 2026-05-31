@@ -2,7 +2,7 @@ import { ref, computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import * as api from '@/services/api';
-import type { AgentInfo, AgentStatus, ConflictEvent } from '@/types';
+import type { AgentConversationEvent, AgentInfo, AgentStatus, ConflictEvent } from '@/types';
 
 export interface ConflictNotification {
   id: string;
@@ -10,10 +10,38 @@ export interface ConflictNotification {
   dismissed: boolean;
 }
 
+function getErrorMessage(err: unknown): string {
+  if (typeof err === 'object' && err !== null) {
+    const response = (err as { response?: { data?: { message?: unknown } } }).response;
+    if (typeof response?.data?.message === 'string') {
+      return response.data.message;
+    }
+    if (err instanceof Error) {
+      return err.message;
+    }
+  }
+  return 'Agent 启动失败';
+}
+
+function getSendErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (typeof err === 'object' && err !== null) {
+    const response = (err as { response?: { data?: { message?: unknown } } }).response;
+    if (typeof response?.data?.message === 'string') {
+      return response.data.message;
+    }
+  }
+  return '发送失败';
+}
+
 export function useAgents() {
   const agents: Ref<Map<string, AgentInfo>> = ref(new Map());
   const terminalOutputs: Ref<Map<string, string>> = ref(new Map());
   const markdownOutputs: Ref<Map<string, string>> = ref(new Map());
+  const conversationEvents: Ref<Map<string, AgentConversationEvent[]>> = ref(new Map());
+  const launchError: Ref<string | null> = ref(null);
 
   // Phase 2: 冲突通知列表
   const conflicts: Ref<ConflictNotification[]> = ref([]);
@@ -23,18 +51,59 @@ export function useAgents() {
   });
 
   async function createAgent(cwd: string, workspaceId?: string, model?: string): Promise<AgentInfo> {
-    const result = await api.createAgent({ cwd, workspaceId, model });
-    // 确保 Phase 2 字段有默认值
-    const agentWithDefaults: AgentInfo = {
-      ...result.agent,
-      parentId: result.agent.parentId ?? null,
-      childIds: result.agent.childIds ?? [],
-      isOrphaned: result.agent.isOrphaned ?? false,
-    };
-    agents.value.set(agentWithDefaults.id, agentWithDefaults);
-    terminalOutputs.value.set(agentWithDefaults.id, '');
-    markdownOutputs.value.set(agentWithDefaults.id, '');
-    return agentWithDefaults;
+    launchError.value = null;
+    try {
+      const result = await api.createAgent({ cwd, workspaceId, model });
+      // 确保 Phase 2 字段有默认值
+      const agentWithDefaults: AgentInfo = {
+        ...result.agent,
+        parentId: result.agent.parentId ?? null,
+        childIds: result.agent.childIds ?? [],
+        isOrphaned: result.agent.isOrphaned ?? false,
+      };
+      agents.value.set(agentWithDefaults.id, agentWithDefaults);
+      terminalOutputs.value.set(agentWithDefaults.id, '');
+      markdownOutputs.value.set(agentWithDefaults.id, '');
+      conversationEvents.value.set(agentWithDefaults.id, []);
+      return agentWithDefaults;
+    } catch (err) {
+      launchError.value = getErrorMessage(err);
+      throw err;
+    }
+  }
+
+  async function loadAgents(): Promise<AgentInfo[]> {
+    const loaded = await api.fetchAgents();
+    agents.value.clear();
+    terminalOutputs.value.clear();
+    markdownOutputs.value.clear();
+    conversationEvents.value.clear();
+
+    for (const agent of loaded) {
+      const agentWithDefaults: AgentInfo = {
+        ...agent,
+        parentId: agent.parentId ?? null,
+        childIds: agent.childIds ?? [],
+        isOrphaned: agent.isOrphaned ?? false,
+      };
+      agents.value.set(agentWithDefaults.id, agentWithDefaults);
+      terminalOutputs.value.set(agentWithDefaults.id, '');
+      markdownOutputs.value.set(agentWithDefaults.id, '');
+      conversationEvents.value.set(agentWithDefaults.id, []);
+    }
+
+    await Promise.all(loaded.map((agent) => loadAgentEvents(agent.id)));
+    return loaded;
+  }
+
+  async function loadAgentEvents(agentId: string): Promise<void> {
+    const events = await api.fetchAgentEvents(agentId);
+    conversationEvents.value.set(agentId, events);
+    rebuildOutputsFromEvents(agentId, events);
+  }
+
+  function clearLaunchError(): void {
+    launchError.value = null;
   }
 
   async function killAgent(id: string, cascade: boolean = true): Promise<void> {
@@ -42,13 +111,41 @@ export function useAgents() {
     agents.value.delete(id);
     terminalOutputs.value.delete(id);
     markdownOutputs.value.delete(id);
+    conversationEvents.value.delete(id);
     // 也从冲突列表中移除相关记录
     conflicts.value = conflicts.value.filter((c) => c.event.agentA !== id && c.event.agentB !== id);
   }
 
+  function appendUserInput(id: string, input: string): void {
+    const terminalCurrent = terminalOutputs.value.get(id) || '';
+    terminalOutputs.value.set(id, `${terminalCurrent}\r\n> ${input}\r\n`);
+
+    const markdownCurrent = markdownOutputs.value.get(id) || '';
+    markdownOutputs.value.set(id, `${markdownCurrent}\n> ${input}\n\n`);
+  }
+
+  function appendSendError(id: string, message: string): void {
+    const terminalCurrent = terminalOutputs.value.get(id) || '';
+    terminalOutputs.value.set(id, `${terminalCurrent}\r\n[发送失败] ${message}\r\n`);
+
+    const markdownCurrent = markdownOutputs.value.get(id) || '';
+    markdownOutputs.value.set(id, `${markdownCurrent}\n\n**发送失败：${message}**\n`);
+  }
+
   function sendStdin(id: string, input: string): void {
-    api.sendStdin(id, input).catch((err) => {
+    appendUserInput(id, input);
+    api.sendStdin(id, input).then((result) => {
+      if (result?.agent) {
+        agents.value.set(id, {
+          ...result.agent,
+          parentId: result.agent.parentId ?? null,
+          childIds: result.agent.childIds ?? [],
+          isOrphaned: result.agent.isOrphaned ?? false,
+        });
+      }
+    }).catch((err) => {
       console.error(`[useAgents] Failed to send stdin to agent ${id}:`, err);
+      appendSendError(id, getSendErrorMessage(err));
     });
   }
 
@@ -64,6 +161,62 @@ export function useAgents() {
     markdownOutputs.value.set(id, mdCurrent + data);
   }
 
+  function appendConversationEvent(event: AgentConversationEvent, updateTextOutputs: boolean = true): void {
+    const current = conversationEvents.value.get(event.agentId) || [];
+    if (!current.some((item) => item.id === event.id)) {
+      conversationEvents.value.set(event.agentId, [...current, event]);
+    }
+
+    if (!updateTextOutputs) return;
+    if (event.kind === 'assistant' && event.content) {
+      appendOutput(event.agentId, event.content);
+    } else if (event.kind === 'stderr' && event.content) {
+      appendOutput(event.agentId, `\n${event.content}`);
+    }
+  }
+
+  function rebuildOutputsFromEvents(agentId: string, events: AgentConversationEvent[]): void {
+    const terminal = events.map(formatEventForTerminal).filter(Boolean).join('');
+    const markdown = events.map(formatEventForMarkdown).filter(Boolean).join('');
+    terminalOutputs.value.set(agentId, terminal);
+    markdownOutputs.value.set(agentId, markdown);
+  }
+
+  function formatEventForTerminal(event: AgentConversationEvent): string {
+    switch (event.kind) {
+      case 'user':
+        return `\r\n> ${event.content}\r\n`;
+      case 'assistant':
+        return event.content;
+      case 'thinking':
+        return event.content ? `\r\n[thinking] ${event.content}\r\n` : '';
+      case 'working':
+        return `\r\n[working] ${event.content || event.title || 'Working'}\r\n`;
+      case 'tool':
+        return `\r\n[${event.status === 'completed' ? 'tool done' : 'tool'}] ${event.title || 'Tool'} ${event.content}\r\n`;
+      case 'summary':
+        return `\r\n[summary] ${event.content}\r\n`;
+      case 'stderr':
+      case 'system':
+        return `\r\n[${event.title || event.kind}] ${event.content}\r\n`;
+      default:
+        return '';
+    }
+  }
+
+  function formatEventForMarkdown(event: AgentConversationEvent): string {
+    switch (event.kind) {
+      case 'user':
+        return `\n> ${event.content}\n\n`;
+      case 'assistant':
+        return event.content;
+      case 'summary':
+        return `\n\n**总结**：${event.content}\n`;
+      default:
+        return event.content ? `\n\n**${event.title || event.kind}**：${event.content}\n` : '';
+    }
+  }
+
   function updateStatus(id: string, status: AgentStatus): void {
     const agent = agents.value.get(id);
     if (agent) {
@@ -74,6 +227,7 @@ export function useAgents() {
   function clearOutput(id: string): void {
     terminalOutputs.value.set(id, '');
     markdownOutputs.value.set(id, '');
+    conversationEvents.value.set(id, []);
   }
 
   // ═══════════ Phase 2: 新增方法 ═══════════
@@ -98,6 +252,7 @@ export function useAgents() {
     agents.value.set(payload.childId, childAgent);
     terminalOutputs.value.set(payload.childId, '');
     markdownOutputs.value.set(payload.childId, '');
+    conversationEvents.value.set(payload.childId, []);
 
     // 更新父 agent 的 childIds
     const parent = agents.value.get(payload.parentId);
@@ -186,8 +341,8 @@ export function useAgents() {
    * Phase 3: 处理 429 预算超限
    */
   function handle429(message: string): void {
+    launchError.value = message;
     console.warn(`[useAgents] Budget exceeded: ${message}`);
-    // 弹出 Toast 由调用方（AgentLauncher）处理
   }
 
   /**
@@ -242,13 +397,19 @@ export function useAgents() {
     agentList,
     terminalOutputs,
     markdownOutputs,
+    conversationEvents,
+    launchError,
     conflicts,
     activeConflicts,
     createAgent,
+    loadAgents,
+    loadAgentEvents,
+    clearLaunchError,
     killAgent,
     sendStdin,
     getAgent,
     appendOutput,
+    appendConversationEvent,
     updateStatus,
     clearOutput,
     // Phase 2 新增

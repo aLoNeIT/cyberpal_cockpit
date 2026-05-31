@@ -4,6 +4,29 @@ import type { ChildProcess } from 'child_process';
 
 export type AgentStatus = 'running' | 'stopped' | 'error';
 
+export type AgentEventKind =
+  | 'user'
+  | 'assistant'
+  | 'working'
+  | 'thinking'
+  | 'tool'
+  | 'summary'
+  | 'stderr'
+  | 'system';
+
+export type AgentEventStatus = 'pending' | 'running' | 'completed' | 'error';
+
+export interface AgentConversationEvent {
+  id: string;
+  agentId: string;
+  kind: AgentEventKind;
+  title?: string;
+  content: string;
+  status?: AgentEventStatus;
+  metadata?: Record<string, unknown>;
+  createdAt: number;
+}
+
 export interface AgentInfo {
   id: string;
   cwd: string;
@@ -16,6 +39,8 @@ export interface AgentInfo {
   taskDescription?: string;
   isOrphaned: boolean;
   model?: string;
+  sessionFile?: string;
+  sessionId?: string;
 }
 
 export interface AgentProcessInfo {
@@ -34,6 +59,8 @@ export interface AgentProcessInfo {
   isOrphaned: boolean;
   fileOperations: FileOperation[];
   model?: string;
+  sessionFile?: string;
+  sessionId?: string;
 }
 
 // ============ 工作区相关类型 ============
@@ -108,6 +135,14 @@ export interface ProviderDetail {
   models: ProviderModel[];
 }
 
+export interface ProviderModelRuntimeConfig {
+  providerId: string;
+  providerName: string;
+  baseUrl: string;
+  apiKey: string;
+  model: ProviderModel;
+}
+
 // ============ WebSocket 消息协议 ============
 
 export interface WSMessage {
@@ -139,7 +174,10 @@ export interface TokenUsage {
   agentId: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   cumulativeTokens: number;
+  costUsd: number;
   lastUpdated: number;
 }
 
@@ -147,8 +185,12 @@ export interface TokenUpdateEvent {
   agentId: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   cumulativeTokens: number;
+  costUsd?: number;
   model?: string;
+  workspaceId?: string | null;
 }
 
 export interface DailyTokenRecord {
@@ -158,7 +200,10 @@ export interface DailyTokenRecord {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   cumulativeTokens: number;
+  costUsd?: number;
 }
 
 export type OverrunPolicy = 'reject_new' | 'kill_oldest' | 'warn_only';
@@ -193,6 +238,7 @@ export interface ModelInfo {
 export type WSMessageType =
   | { type: 'agent:stdout'; agentId: string; payload: { data: string }; timestamp: number }
   | { type: 'agent:stderr'; agentId: string; payload: { data: string }; timestamp: number }
+  | { type: 'agent:event'; agentId: string; payload: AgentConversationEvent; timestamp: number }
   | { type: 'agent:status'; agentId: string; payload: { status: AgentStatus; pid?: number }; timestamp: number }
   | { type: 'agent:exit'; agentId: string; payload: { code: number | null; signal: string | null }; timestamp: number }
   | { type: 'file:changed'; payload: { filePath: string; workspaceId: string; event: 'add' | 'change' | 'unlink' }; timestamp: number }
@@ -225,12 +271,20 @@ export interface CreateAgentResponse {
   agent: AgentInfo;
 }
 
+export interface SendStdinResponse {
+  agent?: AgentInfo;
+}
+
 export interface RestartAgentRequest {
   model: string;
 }
 
 export interface StdinRequest {
   input: string;
+}
+
+export interface AgentEventsResponse {
+  events: AgentConversationEvent[];
 }
 
 export interface TreeQuery {

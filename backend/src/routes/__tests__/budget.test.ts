@@ -85,7 +85,7 @@ describe('Budget Routes', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toBe('Budget updated');
+      expect(res.body.message).toBe('预算已更新');
       expect(mockBudgetCtrl.updateConfig).toHaveBeenCalledWith({
         monthlyLimit: 200000,
         warningThreshold: 0.5,

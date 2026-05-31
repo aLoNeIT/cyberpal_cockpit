@@ -45,7 +45,10 @@ export async function up(db: DatabaseInterface): Promise<void> {
       model TEXT NOT NULL DEFAULT 'unknown',
       input_tokens INTEGER NOT NULL DEFAULT 0,
       output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_write_tokens INTEGER NOT NULL DEFAULT 0,
       cumulative_tokens INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     )
   `);

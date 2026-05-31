@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { ref, watch, inject } from 'vue';
-import type { AgentInfo, ModelInfo } from '@/types';
+import type { AgentConversationEvent, AgentInfo, ModelInfo } from '@/types';
 import AgentTerminal from './AgentTerminal.vue';
 import AgentMarkdown from './AgentMarkdown.vue';
+import AgentProcessTimeline from './AgentProcessTimeline.vue';
 import AgentInput from './AgentInput.vue';
 import WorkerBadge from './WorkerBadge.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import ModelSelector from './ModelSelector.vue';
-import type { useAgents as UseAgentsType } from '@/composables/useAgents';
-import type { useBudget as UseBudgetType } from '@/composables/useBudget';
+import type { useAgents } from '@/composables/useAgents';
+import type { useBudget } from '@/composables/useBudget';
 
 const props = defineProps<{
   agent: AgentInfo;
   terminalOutput: string;
   markdownOutput: string;
+  conversationEvents: AgentConversationEvent[];
 }>();
 
 const emit = defineEmits<{
@@ -21,13 +23,13 @@ const emit = defineEmits<{
   (e: 'kill'): void;
 }>();
 
-const viewMode = ref<'terminal' | 'markdown'>('terminal');
+const viewMode = ref<'process' | 'terminal' | 'markdown'>('process');
 const terminalRef = ref<InstanceType<typeof AgentTerminal> | null>(null);
 const showModelPicker = ref(false);
 
 // Inject composables
-const agents = inject<ReturnType<UseAgentsType>>('useAgents');
-const budget = inject<ReturnType<UseBudgetType>>('useBudget');
+const agents = inject<ReturnType<typeof useAgents>>('useAgents');
+const budget = inject<ReturnType<typeof useBudget>>('useBudget');
 
 function onSendInput(input: string): void {
   emit('send-input', input);
@@ -38,7 +40,13 @@ function onKill(): void {
 }
 
 function toggleViewMode(): void {
-  viewMode.value = viewMode.value === 'terminal' ? 'markdown' : 'terminal';
+  if (viewMode.value === 'process') {
+    viewMode.value = 'terminal';
+  } else if (viewMode.value === 'terminal') {
+    viewMode.value = 'markdown';
+  } else {
+    viewMode.value = 'process';
+  }
 }
 
 function toggleModelPicker(): void {
@@ -109,9 +117,9 @@ const availableModels = budget?.models.value || [];
         <button
           class="text-2xs px-1.5 py-0.5 rounded-sm text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover transition-colors duration-150"
           @click="toggleViewMode"
-          :title="viewMode === 'terminal' ? '切换到 Markdown 视图' : '切换到终端视图'"
+          :title="viewMode === 'process' ? '切换到终端视图' : viewMode === 'terminal' ? '切换到 Markdown 视图' : '切换到过程视图'"
         >
-          {{ viewMode === 'terminal' ? 'MD' : '>_' }}
+          {{ viewMode === 'process' ? '>_' : viewMode === 'terminal' ? 'MD' : '流程' }}
         </button>
         <button
           class="text-2xs px-1.5 py-0.5 rounded-sm text-cockpit-muted hover:text-cockpit-danger hover:bg-cockpit-danger-subtle transition-colors duration-150"
@@ -150,8 +158,12 @@ const availableModels = budget?.models.value || [];
         :output="terminalOutput"
       />
       <AgentMarkdown
-        v-else
+        v-else-if="viewMode === 'markdown'"
         :content="markdownOutput"
+      />
+      <AgentProcessTimeline
+        v-else
+        :events="conversationEvents"
       />
     </div>
 

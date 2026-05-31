@@ -2,6 +2,12 @@ import { CONFIG } from '../config.js';
 import type { DailyTokenRecord, TokenUsage, TokenUpdateEvent } from '../types/index.js';
 import type { TokenRepository } from '../db/repositories/TokenRepository.js';
 
+export interface TokenUsageDetails {
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  costUsd?: number;
+}
+
 export class TokenTracker {
   private agentTokens: Map<string, TokenUsage> = new Map();
   private pendingRecords: DailyTokenRecord[] = [];
@@ -29,14 +35,20 @@ export class TokenTracker {
             agentId: rec.agentId,
             inputTokens: 0,
             outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
             cumulativeTokens: 0,
+            costUsd: 0,
             lastUpdated: Date.now(),
           };
           this.agentTokens.set(rec.agentId, usage);
         }
         usage.inputTokens += rec.inputTokens;
         usage.outputTokens += rec.outputTokens;
+        usage.cacheReadTokens += rec.cacheReadTokens ?? 0;
+        usage.cacheWriteTokens += rec.cacheWriteTokens ?? 0;
         usage.cumulativeTokens += rec.cumulativeTokens;
+        usage.costUsd += rec.costUsd ?? 0;
       }
     } catch {
       // 数据库不可用时从零开始
@@ -46,8 +58,19 @@ export class TokenTracker {
   /**
    * 记录 Token 使用增量
    */
-  recordUsage(agentId: string, inputTokens: number, outputTokens: number, model?: string): void {
-    if (inputTokens === 0 && outputTokens === 0) return;
+  recordUsage(
+    agentId: string,
+    inputTokens: number,
+    outputTokens: number,
+    model?: string,
+    workspaceId?: string | null,
+    details: TokenUsageDetails = {},
+  ): void {
+    const cacheReadTokens = details.cacheReadTokens ?? 0;
+    const cacheWriteTokens = details.cacheWriteTokens ?? 0;
+    const costUsd = details.costUsd ?? 0;
+    const billableTokens = inputTokens + outputTokens + cacheWriteTokens;
+    if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0 && costUsd === 0) return;
 
     let usage = this.agentTokens.get(agentId);
     if (!usage) {
@@ -55,7 +78,10 @@ export class TokenTracker {
         agentId,
         inputTokens: 0,
         outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         cumulativeTokens: 0,
+        costUsd: 0,
         lastUpdated: Date.now(),
       };
       this.agentTokens.set(agentId, usage);
@@ -63,7 +89,10 @@ export class TokenTracker {
 
     usage.inputTokens += inputTokens;
     usage.outputTokens += outputTokens;
-    usage.cumulativeTokens += inputTokens + outputTokens;
+    usage.cacheReadTokens += cacheReadTokens;
+    usage.cacheWriteTokens += cacheWriteTokens;
+    usage.cumulativeTokens += billableTokens;
+    usage.costUsd += costUsd;
     usage.lastUpdated = Date.now();
 
     // 记录到待刷新队列
@@ -74,27 +103,48 @@ export class TokenTracker {
     if (existing) {
       existing.inputTokens += inputTokens;
       existing.outputTokens += outputTokens;
-      existing.cumulativeTokens += inputTokens + outputTokens;
+      existing.cacheReadTokens = (existing.cacheReadTokens ?? 0) + cacheReadTokens;
+      existing.cacheWriteTokens = (existing.cacheWriteTokens ?? 0) + cacheWriteTokens;
+      existing.cumulativeTokens += billableTokens;
+      existing.costUsd = (existing.costUsd ?? 0) + costUsd;
+      existing.workspaceId = workspaceId ?? existing.workspaceId ?? null;
     } else {
       this.pendingRecords.push({
         date: today,
         agentId,
-        workspaceId: null,
+        workspaceId: workspaceId ?? null,
         model: model || 'unknown',
         inputTokens,
         outputTokens,
-        cumulativeTokens: inputTokens + outputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+        cumulativeTokens: billableTokens,
+        costUsd,
       });
     }
 
-    // 推送更新事件
-    this.onTokenUpdate?.({
+    const event: TokenUpdateEvent = {
       agentId,
       inputTokens,
       outputTokens,
       cumulativeTokens: usage.cumulativeTokens,
       model,
-    });
+    };
+    if (cacheReadTokens > 0) {
+      event.cacheReadTokens = cacheReadTokens;
+    }
+    if (cacheWriteTokens > 0) {
+      event.cacheWriteTokens = cacheWriteTokens;
+    }
+    if (usage.costUsd > 0) {
+      event.costUsd = usage.costUsd;
+    }
+    if (workspaceId) {
+      event.workspaceId = workspaceId;
+    }
+
+    // 推送更新事件
+    this.onTokenUpdate?.(event);
   }
 
   /**
@@ -181,7 +231,10 @@ export class TokenTracker {
         model: record.model,
         inputTokens: record.inputTokens,
         outputTokens: record.outputTokens,
+        cacheReadTokens: record.cacheReadTokens,
+        cacheWriteTokens: record.cacheWriteTokens,
         cumulativeTokens: record.cumulativeTokens,
+        costUsd: record.costUsd,
       }).catch(() => {
         // 持久化失败时放回队列
         this.pendingRecords.push(record);

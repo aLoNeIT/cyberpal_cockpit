@@ -22,7 +22,8 @@ import { useIrcLog } from '@/composables/useIrcLog';
 import { useBudget } from '@/composables/useBudget';
 
 import type { LeftPanelTab } from '@/composables/useLayout';
-import type { AgentInfo } from '@/types';
+import type { IrcFilter } from '@/composables/useIrcLog';
+import type { AgentConversationEvent, AgentStatus, BudgetStatus, ConflictEvent, TokenUpdateEvent, WSMessage } from '@/types';
 
 // 初始化 composables
 const layout = useLayout();
@@ -59,65 +60,139 @@ const showLauncher = ref(false);
 const selectedWorkspaceId = ref<string | null>(null);
 const expandedWorkspaces = ref<Set<string>>(new Set());
 
+type AgentOutputPayload = { data: string };
+type AgentStatusPayload = { status: AgentStatus; pid?: number };
+type AgentExitPayload = { code: number | null };
+type FileChangedPayload = { filePath: string };
+type TaskSpawnPayload = { parentId: string; childId: string; taskDescription: string; cwd: string };
+type TaskResultPayload = { childId: string; result: string; tokenCost: number };
+type IrcDmPayload = { from: string; to: string; message: string };
+type IrcBroadcastPayload = { from: string; message: string };
+
+type PayloadMessage<TPayload> = WSMessage & { payload: TPayload };
+type AgentPayloadMessage<TPayload> = PayloadMessage<TPayload> & { agentId: string };
+
+function asAgentPayload<TPayload>(msg: WSMessage): AgentPayloadMessage<TPayload> {
+  return msg as AgentPayloadMessage<TPayload>;
+}
+
+function asPayload<TPayload>(msg: WSMessage): PayloadMessage<TPayload> {
+  return msg as PayloadMessage<TPayload>;
+}
+
+function toggleBudgetPanel(): void {
+  layout.budgetPanelOpen.value = !layout.budgetPanelOpen.value;
+}
+
+function closeBudgetPanel(): void {
+  layout.budgetPanelOpen.value = false;
+}
+
+function onToggleMode(): void {
+  if (layout.mode.value === 'grid') {
+    layout.ensureActiveAgent(agents.agentList.value.map((agent) => agent.id));
+  }
+  layout.toggleMode();
+}
+
+const usageSummary = computed(() => {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cachedTokens = 0;
+  let costUsd = 0;
+  for (const record of budget.tokenRecords.value.values()) {
+    inputTokens += record.inputTokens;
+    outputTokens += record.outputTokens;
+    cachedTokens += (record.cacheReadTokens ?? 0) + (record.cacheWriteTokens ?? 0);
+    costUsd += record.costUsd ?? 0;
+  }
+  return { inputTokens, outputTokens, cachedTokens, costUsd };
+});
+
 onMounted(() => {
   workspaces.loadFromStorage();
   workspaces.syncFromServer();
   ws.connect();
+  agents.loadAgents().then((loadedAgents) => {
+    for (const agent of loadedAgents) {
+      ws.subscribe(agent.id);
+    }
+    layout.ensureActiveAgent(loadedAgents.map((agent) => agent.id));
+  }).catch((err) => {
+    console.error('[AppLayout] Failed to load agents:', err);
+  });
 
   // Phase 1 WS 消息处理
-  ws.onMessage('agent:stdout', (msg: { agentId: string; payload: { data: string } }) => {
+  ws.onMessage('agent:stdout', (message) => {
+    const msg = asAgentPayload<AgentOutputPayload>(message);
     agents.appendOutput(msg.agentId, msg.payload.data);
   });
 
-  ws.onMessage('agent:stderr', (msg: { agentId: string; payload: { data: string } }) => {
+  ws.onMessage('agent:stderr', (message) => {
+    const msg = asAgentPayload<AgentOutputPayload>(message);
     agents.appendOutput(msg.agentId, msg.payload.data);
   });
 
-  ws.onMessage('agent:status', (msg: { agentId: string; payload: { status: string; pid?: number } }) => {
-    agents.updateStatus(msg.agentId, msg.payload.status as 'running' | 'stopped' | 'error');
+  ws.onMessage('agent:event', (message) => {
+    const msg = asAgentPayload<AgentConversationEvent>(message);
+    agents.appendConversationEvent(msg.payload, false);
   });
 
-  ws.onMessage('agent:exit', (msg: { agentId: string; payload: { code: number | null } }) => {
+  ws.onMessage('agent:status', (message) => {
+    const msg = asAgentPayload<AgentStatusPayload>(message);
+    agents.updateStatus(msg.agentId, msg.payload.status);
+  });
+
+  ws.onMessage('agent:exit', (message) => {
+    const msg = asAgentPayload<AgentExitPayload>(message);
     agents.updateStatus(msg.agentId, 'stopped');
   });
 
-  ws.onMessage('file:changed', (msg: { payload: { filePath: string } }) => {
+  ws.onMessage('file:changed', (message) => {
+    const msg = asPayload<FileChangedPayload>(message);
     if (filePreview.currentFile.value && filePreview.currentFile.value.path === msg.payload.filePath) {
       filePreview.openFile(msg.payload.filePath);
     }
   });
 
   // Phase 2: 新增 WS 消息路由
-  ws.onMessage('agent:task-spawn', (msg: { payload: { parentId: string; childId: string; taskDescription: string; cwd: string } }) => {
+  ws.onMessage('agent:task-spawn', (message) => {
+    const msg = asPayload<TaskSpawnPayload>(message);
     agents.handleTaskSpawn(msg.payload);
     // 子 agent 也需要订阅
     ws.subscribe(msg.payload.childId);
   });
 
-  ws.onMessage('agent:task-result', (msg: { payload: { childId: string; result: string; tokenCost: number } }) => {
+  ws.onMessage('agent:task-result', (message) => {
+    const msg = asPayload<TaskResultPayload>(message);
     agents.handleTaskResult(msg.payload);
   });
 
-  ws.onMessage('agent:irc-dm', (msg: { payload: { from: string; to: string; message: string } }) => {
+  ws.onMessage('agent:irc-dm', (message) => {
+    const msg = asPayload<IrcDmPayload>(message);
     ircLog.addMessage('dm', msg.payload.from, msg.payload.to, msg.payload.message);
     agents.handleIrc({ from: msg.payload.from, to: msg.payload.to, message: msg.payload.message, type: 'dm' });
   });
 
-  ws.onMessage('agent:irc-broadcast', (msg: { payload: { from: string; message: string } }) => {
+  ws.onMessage('agent:irc-broadcast', (message) => {
+    const msg = asPayload<IrcBroadcastPayload>(message);
     ircLog.addMessage('broadcast', msg.payload.from, undefined, msg.payload.message);
     agents.handleIrc({ from: msg.payload.from, message: msg.payload.message, type: 'broadcast' });
   });
 
-  ws.onMessage('agent:conflict', (msg: { payload: import('@/types').ConflictEvent }) => {
+  ws.onMessage('agent:conflict', (message) => {
+    const msg = asPayload<ConflictEvent>(message);
     agents.handleConflict(msg.payload);
   });
 
   // Phase 3: 新增 WS 消息路由
-  ws.onMessage('agent:token-update', (msg: { payload: import('@/types').TokenUpdateEvent }) => {
+  ws.onMessage('agent:token-update', (message) => {
+    const msg = asPayload<TokenUpdateEvent>(message);
     budget.onTokenUpdate(msg.payload);
   });
 
-  ws.onMessage('budget:warning', (msg: { payload: import('@/types').BudgetStatus }) => {
+  ws.onMessage('budget:warning', (message) => {
+    const msg = asPayload<BudgetStatus>(message);
     budget.onBudgetWarning(msg.payload);
   });
 
@@ -129,6 +204,7 @@ onMounted(() => {
 async function onAddAgent(cwd: string, workspaceId?: string, model?: string): Promise<void> {
   try {
     const agent = await agents.createAgent(cwd, workspaceId, model);
+    layout.setActiveAgent(agent.id);
     ws.subscribe(agent.id);
     showLauncher.value = false;
   } catch (err) {
@@ -213,6 +289,10 @@ async function onAddWorkspace(name: string, path: string, _projectPaths: string[
   await workspaces.addWorkspace(name, path);
   // TODO: projectPaths 后续可存入工作区配置
 }
+
+function onIrcFilterChange(filter: Partial<IrcFilter>): void {
+  ircLog.setFilter(filter);
+}
 </script>
 
 <template>
@@ -223,15 +303,19 @@ async function onAddWorkspace(name: string, path: string, _projectPaths: string[
       :right-panel-open="layout.rightPanelOpen.value"
       :agent-count="agents.agentList.value.length"
       :connected="ws.connected.value"
+      :input-tokens="usageSummary.inputTokens"
+      :output-tokens="usageSummary.outputTokens"
+      :cached-tokens="usageSummary.cachedTokens"
+      :estimated-cost="usageSummary.costUsd"
       :conflict-count="agents.activeConflicts.value.length"
       :irc-panel-open="layout.ircPanelOpen.value"
       :budget-panel-open="layout.budgetPanelOpen.value"
       :settings-open="settingsOpen"
-      @toggle-mode="layout.toggleMode()"
+      @toggle-mode="onToggleMode"
       @toggle-right-panel="layout.toggleRightPanel()"
       @add-agent="showLauncher = true"
       @toggle-irc="layout.toggleIrcPanel()"
-      @toggle-budget="layout.budgetPanelOpen = !layout.budgetPanelOpen"
+      @toggle-budget="toggleBudgetPanel"
       @toggle-settings="settingsOpen = !settingsOpen"
     />
 
@@ -277,6 +361,7 @@ async function onAddWorkspace(name: string, path: string, _projectPaths: string[
           :active-agent-id="layout.activeAgentId.value"
           :terminal-outputs="agents.terminalOutputs.value"
           :markdown-outputs="agents.markdownOutputs.value"
+          :conversation-events="agents.conversationEvents.value"
           @tab-click="onTabClick"
           @tab-close="onTabClose"
           @send-input="onSendInput"
@@ -315,8 +400,9 @@ async function onAddWorkspace(name: string, path: string, _projectPaths: string[
     <AgentLauncher
       v-if="showLauncher"
       :workspaces="workspaces.workspaces.value"
+      :external-error="agents.launchError.value"
       @confirm="onAddAgent"
-      @cancel="showLauncher = false"
+      @cancel="() => { agents.clearLaunchError(); showLauncher = false; }"
     />
 
     <!-- IRC 日志面板（浮动抽屉） -->
@@ -326,14 +412,14 @@ async function onAddWorkspace(name: string, path: string, _projectPaths: string[
       :filter="ircLog.filter.value"
       :available-agents="agents.agentList.value"
       @close="layout.toggleIrcPanel()"
-      @set-filter="(f: string) => ircLog.setFilter(f)"
+      @set-filter="onIrcFilterChange"
       @clear-filter="ircLog.clearFilter()"
     />
 
     <!-- Phase 3: Budget 仪表盘面板（浮动抽屉） -->
     <BudgetPanel
       v-if="layout.budgetPanelOpen.value"
-      @close="layout.budgetPanelOpen = false"
+      @close="closeBudgetPanel"
     />
 
     <!-- Feature 1: Settings 页面 -->

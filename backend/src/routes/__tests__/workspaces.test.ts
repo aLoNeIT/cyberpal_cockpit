@@ -132,7 +132,7 @@ describe('Workspace Routes (Integration)', () => {
       expect(res.body.data.name).toBe('Test WS');
       expect(res.body.data.path).toBe(tempDir);
       expect(typeof res.body.data.createdAt).toBe('number');
-      expect(res.body.message).toBe('Workspace created');
+      expect(res.body.message).toBe('工作区创建成功');
     });
 
     it('should return 400 when name is missing', async () => {
@@ -142,7 +142,7 @@ describe('Workspace Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('name and path are required');
+      expect(res.body.message).toBe('name 和 path 为必填项');
     });
 
     it('should return 400 when path is missing', async () => {
@@ -179,7 +179,7 @@ describe('Workspace Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toBe('Workspace deleted');
+      expect(res.body.message).toBe('工作区已删除');
 
       const listRes = await request(app).get('/api/workspaces');
       const ids = listRes.body.data.map((w: any) => w.id);
@@ -192,7 +192,7 @@ describe('Workspace Routes (Integration)', () => {
         .expect(404);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('Workspace not found');
+      expect(res.body.message).toBe('工作区不存在');
     });
   });
 
@@ -257,7 +257,7 @@ describe('Workspace Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('path query parameter is required');
+      expect(res.body.message).toBe('path 查询参数为必填项');
     });
 
     it('should return 400 for non-existent file', async () => {

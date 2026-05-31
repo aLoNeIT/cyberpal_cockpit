@@ -23,6 +23,7 @@ import { WorkspaceRepository } from './db/repositories/WorkspaceRepository.js';
 import { AgentRepository } from './db/repositories/AgentRepository.js';
 import { TokenRepository } from './db/repositories/TokenRepository.js';
 import { ProviderRepository } from './db/repositories/ProviderRepository.js';
+import { AgentEventRepository } from './db/repositories/AgentEventRepository.js';
 
 // ========== 数据库初始化 ==========
 const connectionManager = ConnectionManager.getInstance({
@@ -45,6 +46,7 @@ const workspaceRepo = new WorkspaceRepository(db);
 const agentRepo = new AgentRepository(db);
 const tokenRepo = new TokenRepository(db);
 const providerRepo = new ProviderRepository(db);
+const agentEventRepo = new AgentEventRepository(db);
 
 // ========== 服务实例（注入 Repository 依赖） ==========
 const agentManager = new AgentManager();
@@ -56,7 +58,7 @@ const budgetController = new BudgetController(tokenTracker);
 const providerConfigService = new ProviderConfigService(providerRepo);
 
 // Phase 3: 注入依赖到 AgentManager
-agentManager.injectDependencies(tokenTracker, budgetController);
+agentManager.injectDependencies(tokenTracker, budgetController, providerConfigService);
 
 // 创建 Express 应用
 const app = express();
@@ -64,7 +66,7 @@ app.use(cors({ origin: CONFIG.corsOrigin }));
 app.use(express.json());
 
 // 挂载 REST 路由（workspace 路由注入 repository）
-app.use('/api', createAgentRoutes(agentManager));
+app.use('/api', createAgentRoutes(agentManager, agentEventRepo, agentRepo));
 app.use('/api', createWorkspaceRoutes(workspaceService, fileWatcher, workspaceRepo));
 app.use('/api', createBudgetRoutes(budgetController, tokenTracker));
 app.use('/api', createModelRoutes(providerConfigService));
@@ -85,6 +87,20 @@ wss.on('connection', (ws: WebSocket) => {
 agentManager.onOutput = (agentId, stream, data) => {
   const type = stream === 'stdout' ? 'agent:stdout' : 'agent:stderr';
   wsHandler.broadcastToAgent(agentId, { type, agentId, payload: { data }, timestamp: Date.now() });
+};
+
+agentManager.onProcessEvent = (event) => {
+  wsHandler.broadcastToAgent(event.agentId, {
+    type: 'agent:event',
+    agentId: event.agentId,
+    payload: event,
+    timestamp: Date.now(),
+  });
+  agentEventRepo.insert(event).catch(() => {});
+};
+
+agentManager.onSessionMetadata = (agentId, sessionFile, sessionId) => {
+  agentRepo.updateSession(agentId, sessionFile, sessionId).catch(() => {});
 };
 
 agentManager.onStatusChange = (agentId, status, pid?) => {

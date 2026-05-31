@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { AgentManager } from '../../services/AgentManager.js';
 import { createAgentRoutes } from '../agents.js';
-import type { AgentInfo } from '../../types/index.js';
+import type { AgentConversationEvent, AgentInfo } from '../../types/index.js';
 
 // Mock child_process.spawn
 vi.mock('child_process', () => {
@@ -36,13 +36,22 @@ vi.mock('uuid', () => ({
 describe('Agent Routes (Integration)', () => {
   let app: express.Express;
   let agentManager: AgentManager;
+  let eventRepo: { findByAgent: ReturnType<typeof vi.fn> };
+  let agentRepo: { findRecentAgentInfo: ReturnType<typeof vi.fn>; findById: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     agentCounter = 0;
     agentManager = new AgentManager(10);
+    eventRepo = {
+      findByAgent: vi.fn().mockResolvedValue([]),
+    };
+    agentRepo = {
+      findRecentAgentInfo: vi.fn().mockResolvedValue([]),
+      findById: vi.fn(),
+    };
     app = express();
     app.use(express.json());
-    app.use('/api', createAgentRoutes(agentManager));
+    app.use('/api', createAgentRoutes(agentManager, eventRepo as any, agentRepo as any));
   });
 
   // ============ POST /api/agents ============
@@ -60,7 +69,7 @@ describe('Agent Routes (Integration)', () => {
       expect(res.body.data.agent.cwd).toBe('/test/path');
       expect(res.body.data.agent.workspaceId).toBe('ws-001');
       expect(res.body.data.agent.status).toBe('running');
-      expect(res.body.message).toBe('Agent created');
+      expect(res.body.message).toBe('Agent 创建成功');
     });
 
     it('should return 400 when cwd is missing', async () => {
@@ -70,7 +79,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('cwd is required');
+      expect(res.body.message).toBe('cwd 参数为必填项');
     });
 
     it('should return 400 when cwd is empty string', async () => {
@@ -110,6 +119,30 @@ describe('Agent Routes (Integration)', () => {
       expect(res.body.data[0].cwd).toBe('/cwd1');
       expect(res.body.data[1].cwd).toBe('/cwd2');
     });
+
+    it('should include persisted stopped agents so sessions can be loaded after refresh', async () => {
+      agentRepo.findRecentAgentInfo.mockResolvedValue([
+        {
+          id: 'persisted-agent',
+          cwd: '/old-session',
+          status: 'stopped',
+          pid: null,
+          workspaceId: null,
+          createdAt: 10,
+          parentId: null,
+          childIds: [],
+          isOrphaned: false,
+        },
+      ]);
+
+      const res = await request(app)
+        .get('/api/agents')
+        .expect(200);
+
+      expect(res.body.data).toEqual([
+        expect.objectContaining({ id: 'persisted-agent', cwd: '/old-session', status: 'stopped' }),
+      ]);
+    });
   });
 
   // ============ DELETE /api/agents/:id ============
@@ -126,7 +159,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toBe('Agent and descendants terminated');
+      expect(res.body.message).toBe('Agent 及其所有后代已终止');
 
       // Verify it's removed
       const listRes = await request(app).get('/api/agents');
@@ -158,7 +191,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toBe('Input sent');
+      expect(res.body.message).toBe('输入已发送');
     });
 
     it('should return 400 when input is missing', async () => {
@@ -173,7 +206,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('input is required');
+      expect(res.body.message).toBe('input 参数为必填项');
     });
 
     it('should return 400 when input is null', async () => {
@@ -188,6 +221,52 @@ describe('Agent Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
+    });
+
+    it('should resume a persisted stopped agent before sending input', async () => {
+      const resumeSpy = vi.spyOn(agentManager, 'resume').mockReturnValue({
+        id: 'persisted-agent',
+        cwd: '/old-session',
+        status: 'running',
+        pid: 99999,
+        workspaceId: null,
+        createdAt: 10,
+        parentId: null,
+        childIds: [],
+        isOrphaned: false,
+        sessionFile: 'E:\\sessions\\old.jsonl',
+        sessionId: 'session-old',
+      });
+      agentRepo.findById.mockResolvedValue({
+        id: 'persisted-agent',
+        cwd: '/old-session',
+        status: 'stopped',
+        pid: null,
+        workspace_id: null,
+        parent_id: null,
+        task_description: null,
+        model: 'gpt-5.5',
+        session_file: 'E:\\sessions\\old.jsonl',
+        session_id: 'session-old',
+        created_at: 10,
+      });
+
+      const res = await request(app)
+        .post('/api/agents/persisted-agent/stdin')
+        .send({ input: 'continue this session' })
+        .expect(200);
+
+      expect(res.body.code).toBe(0);
+      expect(res.body.data.agent).toMatchObject({ id: 'persisted-agent', status: 'running' });
+      expect(res.body.message).toBe('会话已恢复，输入已发送');
+      expect(resumeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'persisted-agent',
+          sessionFile: 'E:\\sessions\\old.jsonl',
+          sessionId: 'session-old',
+        }),
+        'continue this session',
+      );
     });
   });
 
@@ -229,7 +308,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toContain('descendants');
+      expect(res.body.message).toContain('后代');
 
       // Both parent and child should be gone
       const list = await request(app).get('/api/agents');
@@ -249,7 +328,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toContain('orphaned');
+      expect(res.body.message).toContain('游离态');
 
       // Parent removed, child should still exist and be orphaned
       const list = await request(app).get('/api/agents');
@@ -303,6 +382,50 @@ describe('Agent Routes (Integration)', () => {
     });
   });
 
+  // ============ GET /api/agents/:id/events ============
+
+  describe('GET /api/agents/:id/events', () => {
+    it('should return persisted conversation events for an agent', async () => {
+      const events: AgentConversationEvent[] = [
+        {
+          id: 'evt-1',
+          agentId: 'agent-1',
+          kind: 'user',
+          title: 'User',
+          content: 'Build this',
+          status: 'completed',
+          createdAt: 100,
+        },
+        {
+          id: 'evt-2',
+          agentId: 'agent-1',
+          kind: 'assistant',
+          title: 'Assistant',
+          content: 'Done',
+          status: 'completed',
+          createdAt: 200,
+        },
+      ];
+      eventRepo.findByAgent.mockResolvedValue(events);
+
+      const res = await request(app)
+        .get('/api/agents/agent-1/events')
+        .expect(200);
+
+      expect(res.body.code).toBe(0);
+      expect(res.body.data.events).toEqual(events);
+      expect(eventRepo.findByAgent).toHaveBeenCalledWith('agent-1', 500);
+    });
+
+    it('should clamp the events limit', async () => {
+      await request(app)
+        .get('/api/agents/agent-1/events?limit=99999')
+        .expect(200);
+
+      expect(eventRepo.findByAgent).toHaveBeenCalledWith('agent-1', 2000);
+    });
+  });
+
   // ============ Phase 3: POST /api/agents with model ============
 
   describe('POST /api/agents (Phase 3: model)', () => {
@@ -341,7 +464,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(200);
 
       expect(res.body.code).toBe(0);
-      expect(res.body.message).toBe('Agent restarted with new model');
+      expect(res.body.message).toBe('Agent 已使用新模型重启');
       expect(res.body.data.agent.model).toBe('claude-3-opus');
     });
 
@@ -357,7 +480,7 @@ describe('Agent Routes (Integration)', () => {
         .expect(400);
 
       expect(res.body.code).toBe(-1);
-      expect(res.body.message).toBe('model is required');
+      expect(res.body.message).toBe('model 参数为必填项');
     });
 
     it('should return 404 for non-existent agent', async () => {

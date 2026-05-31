@@ -9,6 +9,10 @@ const props = defineProps<{
   rightPanelOpen: boolean;
   agentCount: number;
   connected: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedTokens?: number;
+  estimatedCost?: number;
   // Phase 2 新增
   conflictCount?: number;
   ircPanelOpen?: boolean;
@@ -60,8 +64,27 @@ function onSelectTheme(mode: ThemeMode): void {
       </span>
     </div>
 
-    <!-- 中间：连接状态 -->
-    <div class="flex items-center gap-2">
+    <!-- 中间：连接状态 + 用量摘要 -->
+    <div class="hidden md:flex items-center gap-3 min-w-0">
+      <div class="flex items-center gap-2">
+        <span
+          class="w-2 h-2 rounded-full"
+          :class="connected ? 'bg-cockpit-success' : 'bg-cockpit-danger'"
+        ></span>
+        <span class="text-xs text-cockpit-muted">
+          {{ connected ? '已连接' : '未连接' }}
+        </span>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-cockpit-muted font-mono">
+        <span title="当前累计输入 tokens">IN {{ (inputTokens || 0).toLocaleString() }}</span>
+        <span title="当前累计输出 tokens">OUT {{ (outputTokens || 0).toLocaleString() }}</span>
+        <span title="缓存 tokens">CACHE {{ (cachedTokens || 0).toLocaleString() }}</span>
+        <span title="累计费用（USD）">${{ (estimatedCost || 0).toFixed(4) }}</span>
+      </div>
+    </div>
+
+    <!-- 小屏连接状态 -->
+    <div class="flex md:hidden items-center gap-2">
       <span
         class="w-2 h-2 rounded-full"
         :class="connected ? 'bg-cockpit-success' : 'bg-cockpit-danger'"

@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 import TokenBarChart from './TokenBarChart.vue';
 import TokenTrendChart from './TokenTrendChart.vue';
 import TokenDimensionView from './TokenDimensionView.vue';
-import type { ModelInfo } from '@/types';
-import type { useBudget as UseBudgetType } from '@/composables/useBudget';
+import type { useBudget } from '@/composables/useBudget';
 
 // inject 从父组件提供
-const budget = inject<ReturnType<UseBudgetType>>('useBudget', null as unknown as ReturnType<UseBudgetType>);
+const budget = inject<ReturnType<typeof useBudget> | null>('useBudget', null);
 const panelWidth = ref(380);
 
 // Phase 3: 趋势图天数切换
@@ -217,10 +216,6 @@ function startResize(e: MouseEvent): void {
     </div>
   </div>
 </template>
-
-<script lang="ts">
-import { inject } from 'vue';
-</script>
 
 <style scoped>
 </style>

@@ -56,6 +56,7 @@ async function loadProviders(): Promise<void> {
     providers.value = await api.fetchProviders();
     if (!selectedId.value && providers.value.length > 0) {
       selectedId.value = providers.value[0].id;
+      await loadDetail(selectedId.value);
     }
   } catch (err) {
     errorMsg.value = '加载提供商列表失败';
@@ -95,16 +96,25 @@ async function handleSave(): Promise<void> {
   errorMsg.value = '';
   successMsg.value = '';
   try {
-    await api.updateProvider(selectedId.value, {
+    const payload: { name: string; baseUrl: string; apiKey?: string; models: ProviderModel[] } = {
       name: editName.value,
       baseUrl: editBaseUrl.value,
-      apiKey: editApiKey.value,
       models: editModels.value,
-    });
-    originalName.value = editName.value;
-    originalBaseUrl.value = editBaseUrl.value;
-    originalApiKey.value = editApiKey.value;
-    originalModels.value = editModels.value.map((m) => ({ ...m }));
+    };
+
+    if (editApiKey.value !== originalApiKey.value && !editApiKey.value.includes('**')) {
+      payload.apiKey = editApiKey.value;
+    }
+
+    const detail = await api.updateProvider(selectedId.value, payload);
+    editName.value = detail.name;
+    editBaseUrl.value = detail.baseUrl;
+    editApiKey.value = detail.apiKey;
+    editModels.value = detail.models.map((m) => ({ ...m }));
+    originalName.value = detail.name;
+    originalBaseUrl.value = detail.baseUrl;
+    originalApiKey.value = detail.apiKey;
+    originalModels.value = detail.models.map((m) => ({ ...m }));
     await loadProviders();
     successMsg.value = '保存成功';
     setTimeout(() => { successMsg.value = ''; }, 2000);

@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import AgentGrid from '@/components/agent/AgentGrid.vue';
 import AgentTabBar from '@/components/agent/AgentTabBar.vue';
 import AgentCell from '@/components/agent/AgentCell.vue';
-import type { AgentInfo } from '@/types';
+import type { AgentConversationEvent, AgentInfo } from '@/types';
 import type { LayoutMode } from '@/composables/useLayout';
 
 const props = defineProps<{
@@ -12,6 +12,7 @@ const props = defineProps<{
   activeAgentId: string | null;
   terminalOutputs: Map<string, string>;
   markdownOutputs: Map<string, string>;
+  conversationEvents: Map<string, AgentConversationEvent[]>;
 }>();
 
 const emit = defineEmits<{
@@ -25,6 +26,18 @@ const activeAgent = computed(() => {
   if (!props.activeAgentId) return null;
   return props.agents.find((a) => a.id === props.activeAgentId) || null;
 });
+
+function emitActiveAgentInput(input: string): void {
+  if (activeAgent.value) {
+    emit('send-input', activeAgent.value.id, input);
+  }
+}
+
+function emitActiveAgentKill(): void {
+  if (activeAgent.value) {
+    emit('kill-agent', activeAgent.value.id);
+  }
+}
 </script>
 
 <template>
@@ -44,6 +57,7 @@ const activeAgent = computed(() => {
       :agents="agents"
       :terminal-outputs="terminalOutputs"
       :markdown-outputs="markdownOutputs"
+      :conversation-events="conversationEvents"
       @send-input="(agentId, input) => emit('send-input', agentId, input)"
       @kill-agent="(id) => emit('kill-agent', id)"
     />
@@ -55,8 +69,9 @@ const activeAgent = computed(() => {
         :agent="activeAgent"
         :terminal-output="terminalOutputs.get(activeAgent.id) || ''"
         :markdown-output="markdownOutputs.get(activeAgent.id) || ''"
-        @send-input="(input) => emit('send-input', activeAgent.id, input)"
-        @kill="emit('kill-agent', activeAgent.id)"
+        :conversation-events="conversationEvents.get(activeAgent.id) || []"
+        @send-input="emitActiveAgentInput"
+        @kill="emitActiveAgentKill"
       />
     </div>
 

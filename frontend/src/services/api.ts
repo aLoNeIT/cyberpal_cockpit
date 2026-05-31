@@ -2,8 +2,11 @@ import axios from 'axios';
 import type {
   ApiResponse,
   AgentInfo,
+  AgentEventsResponse,
+  AgentConversationEvent,
   CreateAgentRequest,
   CreateAgentResponse,
+  SendStdinResponse,
   WorkspaceConfig,
   WorkspaceCreateRequest,
   FileTreeNode,
@@ -45,6 +48,13 @@ export async function fetchAgents(): Promise<AgentInfo[]> {
   return res.data.data;
 }
 
+export async function fetchAgentEvents(id: string, limit: number = 500): Promise<AgentConversationEvent[]> {
+  const res = await http.get<ApiResponse<AgentEventsResponse>>(`/agents/${id}/events`, {
+    params: { limit },
+  });
+  return res.data.data.events;
+}
+
 export async function createAgent(req: CreateAgentRequest): Promise<CreateAgentResponse> {
   const res = await http.post<ApiResponse<CreateAgentResponse>>('/agents', req);
   return res.data.data;
@@ -60,8 +70,9 @@ export async function fetchAgentChildren(id: string): Promise<AgentInfo[]> {
   return res.data.data;
 }
 
-export async function sendStdin(id: string, input: string): Promise<void> {
-  await http.post(`/agents/${id}/stdin`, { input });
+export async function sendStdin(id: string, input: string): Promise<SendStdinResponse | null> {
+  const res = await http.post<ApiResponse<SendStdinResponse | null>>(`/agents/${id}/stdin`, { input });
+  return res.data.data;
 }
 
 // Phase 3: 模型切换 restart

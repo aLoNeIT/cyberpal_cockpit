@@ -12,6 +12,8 @@ const props = defineProps<{
 const terminalEl = ref<HTMLDivElement | null>(null);
 let terminal: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
+let resizeObserver: ResizeObserver | null = null;
+let themeObserver: MutationObserver | null = null;
 const isLight = ref(false);
 
 /** 亮色主题配置 — 匹配设计系统 v1.0 */
@@ -77,7 +79,21 @@ function scrollToBottom(): void {
   }
 }
 
+function normalizeTerminalOutput(output: string): string {
+  return output.replace(/\r\n|\r|\n/g, '\r\n');
+}
+
 defineExpose({ scrollToBottom });
+
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  themeObserver?.disconnect();
+  terminal?.dispose();
+  resizeObserver = null;
+  themeObserver = null;
+  terminal = null;
+  fitAddon = null;
+});
 
 onMounted(async () => {
   await nextTick();
@@ -108,11 +124,11 @@ onMounted(async () => {
 
   // 如果已有输出，写入终端
   if (props.output) {
-    terminal.write(props.output);
+    terminal.write(normalizeTerminalOutput(props.output));
   }
 
   // 响应窗口大小变化
-  const resizeObserver = new ResizeObserver(() => {
+  resizeObserver = new ResizeObserver(() => {
     if (fitAddon) {
       try {
         fitAddon.fit();
@@ -125,7 +141,7 @@ onMounted(async () => {
   resizeObserver.observe(terminalEl.value);
 
   // 监听主题变化
-  const themeObserver = new MutationObserver(() => {
+  themeObserver = new MutationObserver(() => {
     const newIsLight = detectTheme();
     if (newIsLight !== isLight.value) {
       isLight.value = newIsLight;
@@ -139,12 +155,6 @@ onMounted(async () => {
     attributes: true,
     attributeFilter: ['data-theme'],
   });
-
-  onUnmounted(() => {
-    resizeObserver.disconnect();
-    themeObserver.disconnect();
-    terminal?.dispose();
-  });
 });
 
 // 监听输出变化
@@ -154,7 +164,7 @@ watch(() => props.output, (newOutput, oldOutput) => {
     const oldLen = oldOutput?.length || 0;
     const delta = newOutput.slice(oldLen);
     if (delta) {
-      terminal.write(delta);
+      terminal.write(normalizeTerminalOutput(delta));
     }
   }
 });

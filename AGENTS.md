@@ -164,7 +164,9 @@ DB 写入 → Service 回调 → WsHandler.broadcast → WebSocket
 AgentLauncher (前端) → POST /api/agents
   → AgentManager.spawn(cwd, model?)
     → BudgetController.checkBudget() → ok/warning/rejected
-    → child_process.spawn('oh-my-pi', ['--mode', 'json'], { cwd })
+    → child_process.spawn(CONFIG.ohMyPiPath, [...CONFIG.ohMyPiArgsPrefix, '--mode', 'json'], { cwd })
+      # 默认 CONFIG.ohMyPiPath 指向项目内 Bun 运行时（Windows 为 backend/node_modules/bun/bin/bun.exe），并将项目内 @oh-my-pi/pi-coding-agent/src/cli.ts 作为首个参数传入
+      # 不要求用户全局安装 bun 或 oh-my-pi
     → 监听 stdout → parseJSONL → TokenTracker.recordUsage()
     → 监听 exit → AgentManager.cleanup()
   → WsHandler.broadcastToAgent → 前端 AgentCell 实时渲染

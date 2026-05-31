@@ -6,6 +6,7 @@ vi.mock('../../config.js', () => ({
     port: 3001,
     corsOrigin: 'http://localhost:5173',
     ohMyPiPath: 'oh-my-pi',
+    ohMyPiArgsPrefix: [],
     maxAgents: 4,
     agentSpawnTimeout: 10000,
     wsHeartbeatInterval: 30000,
@@ -49,7 +50,10 @@ function createMockTokenRepo() {
         model: record.model,
         inputTokens: record.inputTokens,
         outputTokens: record.outputTokens,
+        cacheReadTokens: record.cacheReadTokens ?? 0,
+        cacheWriteTokens: record.cacheWriteTokens ?? 0,
         cumulativeTokens: record.cumulativeTokens,
+        costUsd: record.costUsd ?? 0,
       });
     }),
     upsertDaily: vi.fn(async (record: any) => {
@@ -59,7 +63,10 @@ function createMockTokenRepo() {
       if (idx >= 0) {
         records[idx].inputTokens += record.inputTokens;
         records[idx].outputTokens += record.outputTokens;
+        records[idx].cacheReadTokens += record.cacheReadTokens ?? 0;
+        records[idx].cacheWriteTokens += record.cacheWriteTokens ?? 0;
         records[idx].cumulativeTokens += record.cumulativeTokens;
+        records[idx].costUsd += record.costUsd ?? 0;
       } else {
         records.push({
           date: record.date,
@@ -68,7 +75,10 @@ function createMockTokenRepo() {
           model: record.model,
           inputTokens: record.inputTokens,
           outputTokens: record.outputTokens,
+          cacheReadTokens: record.cacheReadTokens ?? 0,
+          cacheWriteTokens: record.cacheWriteTokens ?? 0,
           cumulativeTokens: record.cumulativeTokens,
+          costUsd: record.costUsd ?? 0,
         });
       }
     }),
@@ -181,6 +191,50 @@ describe('TokenTracker', () => {
         outputTokens: 5,
         cumulativeTokens: 15,
         model: 'gpt-4o',
+      });
+    });
+
+    it('should persist workspaceId with token records', async () => {
+      const { tracker: t, records } = newTracker();
+      t.recordUsage('agent-1', 10, 5, 'gpt-4o', 'ws-001');
+      t.flushAgent('agent-1');
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(records[0].workspaceId).toBe('ws-001');
+    });
+
+    it('should include cache and cost usage in totals, events, and persisted records', async () => {
+      const { tracker: t, records } = newTracker();
+      const onUpdate = vi.fn();
+      t.onTokenUpdate = onUpdate;
+
+      t.recordUsage('agent-1', 100, 50, 'gpt-4o', 'ws-001', {
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 25,
+        costUsd: 0.012345,
+      });
+      t.flushAgent('agent-1');
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(t.getAgentTokens('agent-1')).toBe(175);
+      expect(onUpdate).toHaveBeenCalledWith({
+        agentId: 'agent-1',
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 25,
+        cumulativeTokens: 175,
+        costUsd: 0.012345,
+        model: 'gpt-4o',
+        workspaceId: 'ws-001',
+      });
+      expect(records[0]).toMatchObject({
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 25,
+        cumulativeTokens: 175,
+        costUsd: 0.012345,
       });
     });
   });

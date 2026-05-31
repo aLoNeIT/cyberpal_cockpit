@@ -15,7 +15,10 @@ export interface TokenRecordRow {
   model: string;
   input_tokens: number;
   output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
   cumulative_tokens: number;
+  cost_usd: number;
   created_at: number;
 }
 
@@ -34,11 +37,14 @@ export class TokenRepository {
     model: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
     cumulativeTokens: number;
+    costUsd?: number;
   }): Promise<void> {
     await this.db.execute(
-      `INSERT INTO token_records (date, agent_id, workspace_id, model, input_tokens, output_tokens, cumulative_tokens, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO token_records (date, agent_id, workspace_id, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cumulative_tokens, cost_usd, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         record.date,
         record.agentId,
@@ -46,7 +52,10 @@ export class TokenRepository {
         record.model,
         record.inputTokens,
         record.outputTokens,
+        record.cacheReadTokens ?? 0,
+        record.cacheWriteTokens ?? 0,
         record.cumulativeTokens,
+        record.costUsd ?? 0,
         Date.now(),
       ]
     );
@@ -63,10 +72,13 @@ export class TokenRepository {
     model: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
     cumulativeTokens: number;
+    costUsd?: number;
   }): Promise<void> {
     const existing = await this.db.queryOne<TokenRecordRow>(
-      'SELECT id, input_tokens, output_tokens, cumulative_tokens FROM token_records WHERE date = ? AND agent_id = ?',
+      'SELECT id, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cumulative_tokens, cost_usd FROM token_records WHERE date = ? AND agent_id = ?',
       [record.date, record.agentId]
     );
 
@@ -75,13 +87,19 @@ export class TokenRepository {
         `UPDATE token_records
          SET input_tokens = input_tokens + ?,
              output_tokens = output_tokens + ?,
+             cache_read_tokens = cache_read_tokens + ?,
+             cache_write_tokens = cache_write_tokens + ?,
              cumulative_tokens = cumulative_tokens + ?,
+             cost_usd = cost_usd + ?,
              model = ?
          WHERE id = ?`,
         [
           record.inputTokens,
           record.outputTokens,
+          record.cacheReadTokens ?? 0,
+          record.cacheWriteTokens ?? 0,
           record.cumulativeTokens,
+          record.costUsd ?? 0,
           record.model,
           existing.id,
         ]
@@ -130,7 +148,10 @@ export class TokenRepository {
       model: row.model,
       inputTokens: row.input_tokens,
       outputTokens: row.output_tokens,
+      cacheReadTokens: row.cache_read_tokens ?? 0,
+      cacheWriteTokens: row.cache_write_tokens ?? 0,
       cumulativeTokens: row.cumulative_tokens,
+      costUsd: row.cost_usd ?? 0,
     }));
   }
 
@@ -148,7 +169,10 @@ export class TokenRepository {
       model: row.model,
       inputTokens: row.input_tokens,
       outputTokens: row.output_tokens,
+      cacheReadTokens: row.cache_read_tokens ?? 0,
+      cacheWriteTokens: row.cache_write_tokens ?? 0,
       cumulativeTokens: row.cumulative_tokens,
+      costUsd: row.cost_usd ?? 0,
     }));
   }
 
@@ -186,7 +210,10 @@ export class TokenRepository {
     model: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
     cumulativeTokens: number;
+    costUsd?: number;
   }>): Promise<void> {
     for (const record of records) {
       await this.insert(record);

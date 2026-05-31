@@ -55,7 +55,7 @@ export function useBudget() {
   function getByWorkspace(agentWorkspaceMap: Map<string, string>): Map<string, number> {
     const map = new Map<string, number>();
     for (const [agentId, record] of tokenRecords.value) {
-      const ws = agentWorkspaceMap.get(agentId) || 'unknown';
+      const ws = record.workspaceId || agentWorkspaceMap.get(agentId) || 'unknown';
       map.set(ws, (map.get(ws) || 0) + record.cumulativeTokens);
     }
     return new Map([...map.entries()].sort((a, b) => b[1] - a[1]));

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import type { WorkspaceConfig, ModelInfo } from '@/types';
 import * as api from '@/services/api';
 import ModelSelector from './ModelSelector.vue';
 
 const props = defineProps<{
   workspaces: WorkspaceConfig[];
+  externalError?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -60,6 +61,8 @@ function handleConfirm(): void {
     emit('confirm', manualCwd.value.trim(), undefined, selectedModel.value);
   }
 }
+
+const visibleError = computed(() => errorMsg.value || props.externalError || '');
 
 function handleCancel(): void {
   emit('cancel');
@@ -125,7 +128,7 @@ function handleCancel(): void {
         />
       </div>
 
-      <p v-if="errorMsg" class="px-4 pb-2 text-xs text-cockpit-danger">{{ errorMsg }}</p>
+      <p v-if="visibleError" class="px-4 pb-2 text-xs text-cockpit-danger">{{ visibleError }}</p>
 
       <!-- Phase 3: 模型选择 -->
       <div class="px-4 pb-3">

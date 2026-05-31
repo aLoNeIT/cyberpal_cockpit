@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+
+const { prepareOmpRuntimeConfigMock } = vi.hoisted(() => ({
+  prepareOmpRuntimeConfigMock: vi.fn(),
+}));
+
+vi.mock('../../utils/ompRuntimeConfig.js', () => ({
+  prepareOmpRuntimeConfig: prepareOmpRuntimeConfigMock,
+}));
+
 import { AgentManager } from '../AgentManager.js';
 import type { AgentInfo } from '../../types/index.js';
 
@@ -48,6 +57,7 @@ describe('AgentManager', () => {
     mockProcess.exitCode = null;
     mockProcess.kill = vi.fn();
     mockStdin.write = vi.fn();
+    prepareOmpRuntimeConfigMock.mockReset();
     manager = new AgentManager(4);
   });
 
@@ -66,8 +76,21 @@ describe('AgentManager', () => {
       const agentInfo = manager.spawn('/test/cwd');
 
       expect(spawn).toHaveBeenCalledWith(
-        expect.stringContaining('oh-my-pi'),
-        ['--mode', 'json'],
+        expect.stringContaining('node_modules'),
+        [
+          expect.stringContaining('@oh-my-pi'),
+          '--mode',
+          'rpc',
+        ],
+        { cwd: '/test/cwd' },
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        expect.stringContaining(process.platform === 'win32' ? 'bun.exe' : 'bun'),
+        [
+          expect.stringContaining('cli.ts'),
+          '--mode',
+          'rpc',
+        ],
         { cwd: '/test/cwd' },
       );
       expect(agentInfo).toMatchObject<Partial<AgentInfo>>({
@@ -124,6 +147,145 @@ describe('AgentManager', () => {
         'mock-agent-uuid-001',
         'stdout',
         'hello world\n',
+      );
+    });
+
+    it('should render RPC text deltas as readable stdout without raw protocol JSON', () => {
+      const outputCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.spawn('/test/cwd');
+
+      const rpcLine = JSON.stringify({
+        type: 'message_update',
+        assistantMessageEvent: {
+          type: 'text_delta',
+          delta: 'CPC_TOKENX24_SMOKE_OK',
+        },
+      });
+
+      mockStdout.emit('data', Buffer.from(`${rpcLine}\n`));
+
+      expect(outputCallback).toHaveBeenCalledTimes(1);
+      expect(outputCallback).toHaveBeenCalledWith(
+        'mock-agent-uuid-001',
+        'stdout',
+        'CPC_TOKENX24_SMOKE_OK',
+      );
+      expect(outputCallback).not.toHaveBeenCalledWith(
+        'mock-agent-uuid-001',
+        'stdout',
+        `${rpcLine}\n`,
+      );
+    });
+
+    it('should suppress transcript JSON frames from stdout', () => {
+      const outputCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.spawn('/test/cwd');
+
+      const chunk = [
+        JSON.stringify({ type: 'session', id: 'session-1', cwd: '/test/cwd' }),
+        JSON.stringify({ type: 'model_change', model: 'tokenx24/gpt-5.5' }),
+        JSON.stringify({
+          type: 'message',
+          message: {
+            role: 'toolResult',
+            content: [{ type: 'text', text: 'internal tool result should not render' }],
+          },
+        }),
+      ].join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(chunk));
+
+      expect(outputCallback).not.toHaveBeenCalled();
+    });
+
+    it('should suppress non-display RPC protocol frames from stdout', () => {
+      const outputCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.spawn('/test/cwd');
+
+      const chunk = [
+        JSON.stringify({ type: 'ready' }),
+        JSON.stringify({ type: 'response', command: 'prompt', success: true }),
+        JSON.stringify({ type: 'agent_start' }),
+        JSON.stringify({ type: 'tool_result', toolUseId: 'tool-1', result: { content: 'internal' } }),
+        JSON.stringify({ type: 'tool_execution_start', toolCallId: 'tool-1', toolName: 'read' }),
+        JSON.stringify({ type: 'tool_execution_end', toolCallId: 'tool-1', toolName: 'read', result: { content: [] } }),
+        JSON.stringify({ type: 'turn_start' }),
+        JSON.stringify({ type: 'message_start', message: { role: 'assistant', content: [{ type: 'text', text: 'C' }] } }),
+        JSON.stringify({ type: 'tool_execution_update', toolCallId: 'tool-1', toolName: 'read', args: {}, partialResult: { content: [] } }),
+      ].join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(chunk));
+
+      expect(outputCallback).not.toHaveBeenCalled();
+    });
+
+    it('should suppress tool_use protocol frames from stdout while still processing them', () => {
+      const outputCallback = vi.fn();
+      const conflictCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.onConflictDetected = conflictCallback;
+      manager.spawn('/test/cwd');
+
+      const jsonLine = JSON.stringify({
+        type: 'tool_use',
+        name: 'write_to_file',
+        arguments: {
+          file_path: '/tmp/generated.ts',
+          content: 'export const ok = true;',
+        },
+      });
+
+      mockStdout.emit('data', Buffer.from(`${jsonLine}\n`));
+
+      expect(outputCallback).not.toHaveBeenCalled();
+      expect(conflictCallback).toHaveBeenCalledWith(
+        'mock-agent-uuid-001',
+        '/tmp/generated.ts',
+        'create',
+      );
+    });
+
+    it('should suppress RPC protocol frames split across stdout chunks', () => {
+      const outputCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.spawn('/test/cwd');
+
+      const rpcLine = JSON.stringify({
+        type: 'tool_result',
+        toolUseId: 'tool-1',
+        result: { content: 'internal protocol payload' },
+      });
+
+      mockStdout.emit('data', Buffer.from(rpcLine.slice(0, 20)));
+      mockStdout.emit('data', Buffer.from(`${rpcLine.slice(20)}\n`));
+
+      expect(outputCallback).not.toHaveBeenCalled();
+    });
+
+    it('should render RPC text deltas split across stdout chunks', () => {
+      const outputCallback = vi.fn();
+      manager.onOutput = outputCallback;
+      manager.spawn('/test/cwd');
+
+      const rpcLine = JSON.stringify({
+        type: 'message_update',
+        assistantMessageEvent: {
+          type: 'text_delta',
+          delta: 'split text',
+        },
+      });
+
+      mockStdout.emit('data', Buffer.from(rpcLine.slice(0, 24)));
+      mockStdout.emit('data', Buffer.from(`${rpcLine.slice(24)}\n`));
+
+      expect(outputCallback).toHaveBeenCalledTimes(1);
+      expect(outputCallback).toHaveBeenCalledWith(
+        'mock-agent-uuid-001',
+        'stdout',
+        'split text',
       );
     });
 
@@ -217,11 +379,80 @@ describe('AgentManager', () => {
   // ============ sendStdin ============
 
   describe('sendStdin', () => {
-    it('should write input to process stdin', () => {
+    it('should write prompt commands to the RPC process stdin', () => {
       manager.spawn('/test/cwd');
       manager.sendStdin('mock-agent-uuid-001', 'test input');
 
-      expect(mockStdin.write).toHaveBeenCalledWith('test input\n');
+      expect(mockStdin.write).toHaveBeenCalledWith(
+        `${JSON.stringify({ type: 'prompt', message: 'test input' })}\n`,
+      );
+    });
+
+    it('should queue a second chat message as follow_up while the agent is busy', () => {
+      manager.spawn('/test/cwd');
+
+      const turnStart = JSON.stringify({ type: 'turn_start' });
+      mockStdout.emit('data', Buffer.from(`${turnStart}\n`));
+
+      manager.sendStdin('mock-agent-uuid-001', 'second input');
+
+      expect(mockStdin.write).toHaveBeenCalledWith(
+        `${JSON.stringify({ type: 'follow_up', message: 'second input' })}\n`,
+      );
+    });
+
+    it('should queue an immediate second chat message as follow_up before turn_start arrives', () => {
+      manager.spawn('/test/cwd');
+
+      manager.sendStdin('mock-agent-uuid-001', 'first input');
+      manager.sendStdin('mock-agent-uuid-001', 'second input');
+
+      expect(mockStdin.write).toHaveBeenNthCalledWith(
+        1,
+        `${JSON.stringify({ type: 'prompt', message: 'first input' })}\n`,
+      );
+      expect(mockStdin.write).toHaveBeenNthCalledWith(
+        2,
+        `${JSON.stringify({ type: 'follow_up', message: 'second input' })}\n`,
+      );
+    });
+
+    it('should resume a persisted session with the original agent id before sending input', () => {
+      const agent = manager.resume(
+        {
+          id: 'persisted-agent',
+          cwd: '/test/cwd',
+          status: 'stopped',
+          pid: null,
+          workspaceId: 'ws-1',
+          createdAt: 123,
+          parentId: null,
+          childIds: [],
+          isOrphaned: false,
+          model: 'gpt-5.5',
+          sessionFile: 'E:\\sessions\\old.jsonl',
+          sessionId: 'session-old',
+        },
+        'continue work',
+      );
+
+      expect(agent).toMatchObject({
+        id: 'persisted-agent',
+        cwd: '/test/cwd',
+        status: 'running',
+        workspaceId: 'ws-1',
+        sessionFile: 'E:\\sessions\\old.jsonl',
+        sessionId: 'session-old',
+      });
+      expect(mockStdin.write).toHaveBeenNthCalledWith(
+        1,
+        `${JSON.stringify({ type: 'prompt', message: 'continue work' })}\n`,
+      );
+      expect(spawn).toHaveBeenCalledWith(
+        expect.stringContaining(process.platform === 'win32' ? 'bun.exe' : 'bun'),
+        expect.arrayContaining(['--mode', 'rpc', '--resume', 'E:\\sessions\\old.jsonl']),
+        expect.objectContaining({ cwd: '/test/cwd' }),
+      );
     });
 
     it('should throw when agent not found', () => {
@@ -248,6 +479,66 @@ describe('AgentManager', () => {
       expect(() => manager.sendStdin('mock-agent-uuid-001', 'input')).toThrow(
         'stdin is not available',
       );
+    });
+  });
+
+  // ============ structured process events ============
+
+  describe('structured process events', () => {
+    it('should emit working, thinking, tool, assistant, and summary events from RPC frames', () => {
+      const eventCallback = vi.fn();
+      manager.onProcessEvent = eventCallback;
+      manager.spawn('/test/cwd');
+
+      const frames = [
+        { type: 'turn_start' },
+        { type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', delta: 'checking files' } },
+        { type: 'tool_execution_start', toolCallId: 'tool-1', toolName: 'shell_command', args: { command: 'npm test' } },
+        { type: 'tool_execution_end', toolCallId: 'tool-1', toolName: 'shell_command', result: { content: 'ok' } },
+        { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Done' } },
+        { type: 'turn_end' },
+      ].map((frame) => JSON.stringify(frame)).join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(frames));
+
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'working', title: 'Working' }),
+      );
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'thinking', content: 'checking files' }),
+      );
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'tool', title: 'shell_command', content: 'npm test' }),
+      );
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'tool', status: 'completed' }),
+      );
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'assistant', content: 'Done' }),
+      );
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'mock-agent-uuid-001', kind: 'summary', title: 'Summary' }),
+      );
+    });
+
+    it('should capture session metadata from RPC get_state responses', () => {
+      manager.spawn('/test/cwd');
+
+      const frame = JSON.stringify({
+        type: 'response',
+        command: 'get_state',
+        success: true,
+        data: {
+          sessionFile: 'E:\\sessions\\current.jsonl',
+          sessionId: 'session-current',
+        },
+      });
+      mockStdout.emit('data', Buffer.from(`${frame}\n`));
+
+      expect(manager.getAgent('mock-agent-uuid-001')).toMatchObject({
+        sessionFile: 'E:\\sessions\\current.jsonl',
+        sessionId: 'session-current',
+      });
     });
   });
 
@@ -826,6 +1117,51 @@ describe('AgentManager', () => {
       const agents = manager.getAllAgents();
       expect(agents[0].model).toBe('deepseek-chat');
     });
+
+    it('should pass provider-qualified model and CPC agent config dir for configured custom providers', () => {
+      const runtimeConfig = {
+        providerId: 'tokenx24',
+        providerName: 'TokenX24',
+        baseUrl: 'https://tokenx24.com/v1',
+        apiKey: 'secret-token',
+        model: { id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true },
+      };
+      const providerConfigService = {
+        getModelRuntimeConfig: vi.fn().mockReturnValue(runtimeConfig),
+      };
+      prepareOmpRuntimeConfigMock.mockReturnValue({
+        agentDir: 'E:\\Work\\Web\\cyberpal_cockpit\\.tmp\\omp-agent\\agent',
+        modelSelector: 'tokenx24/gpt-5.5',
+      });
+
+      manager.injectDependencies(
+        { recordUsage: vi.fn(), getTotalUsage: vi.fn().mockReturnValue(0), flushAgent: vi.fn(), getCurrentMonthRecords: vi.fn().mockReturnValue([]), archiveMonth: vi.fn(), resetCurrentMonth: vi.fn() } as any,
+        { checkBudget: vi.fn().mockReturnValue({ verdict: 'ok', status: {} }), getStatus: vi.fn() } as any,
+        providerConfigService as any,
+      );
+
+      const agent = manager.spawn('/test', 'ws-1', undefined, undefined, 'gpt-5.5');
+
+      expect(agent.model).toBe('gpt-5.5');
+      expect(providerConfigService.getModelRuntimeConfig).toHaveBeenCalledWith('gpt-5.5');
+      expect(prepareOmpRuntimeConfigMock).toHaveBeenCalledWith(expect.any(String), runtimeConfig);
+      expect(spawn).toHaveBeenCalledWith(
+        expect.stringContaining(process.platform === 'win32' ? 'bun.exe' : 'bun'),
+        [
+          expect.stringContaining('cli.ts'),
+          '--mode',
+          'rpc',
+          '--model',
+          'tokenx24/gpt-5.5',
+        ],
+        {
+          cwd: '/test',
+          env: expect.objectContaining({
+            PI_CODING_AGENT_DIR: 'E:\\Work\\Web\\cyberpal_cockpit\\.tmp\\omp-agent\\agent',
+          }),
+        },
+      );
+    });
   });
 
   // ============ Phase 3: budget pre-check ============
@@ -979,6 +1315,119 @@ describe('AgentManager', () => {
       mockStdout.emit('data', Buffer.from(jsonlLine + '\n'));
 
       expect(mocks.tt.recordUsage).toHaveBeenCalledWith(agentId, 200, 120, 'deepseek-chat');
+    });
+
+    it('should pass workspaceId when recording token usage', () => {
+      const mocks = makeP3Mocks();
+      manager.injectDependencies(mocks.tt as any, mocks.bc as any);
+      manager.spawn('/agent-a', 'workspace-a', undefined, undefined, 'deepseek-chat');
+      const agentId = 'mock-agent-uuid-001';
+
+      const jsonlLine = JSON.stringify({
+        type: 'message',
+        token_usage: { input: 25, output: 15 },
+      });
+
+      mockStdout.emit('data', Buffer.from(jsonlLine + '\n'));
+
+      expect(mocks.tt.recordUsage).toHaveBeenCalledWith(agentId, 25, 15, 'deepseek-chat', 'workspace-a');
+    });
+
+    it('should extract RPC message usage from assistant events', () => {
+      const mocks = makeP3Mocks();
+      manager.injectDependencies(mocks.tt as any, mocks.bc as any);
+      manager.spawn('/agent-a', 'workspace-a', undefined, undefined, 'gpt-5.5');
+      const agentId = 'mock-agent-uuid-001';
+
+      const jsonlLine = JSON.stringify({
+        type: 'message_update',
+        assistantMessageEvent: {
+          type: 'text_end',
+          partial: {
+            usage: {
+              input: 28067,
+              output: 124,
+              totalTokens: 28191,
+            },
+          },
+        },
+      });
+
+      mockStdout.emit('data', Buffer.from(`${jsonlLine}\n`));
+
+      expect(mocks.tt.recordUsage).toHaveBeenCalledWith(agentId, 28067, 124, 'gpt-5.5', 'workspace-a');
+    });
+
+    it('should extract RPC cache and cost usage from assistant events', () => {
+      const mocks = makeP3Mocks();
+      manager.injectDependencies(mocks.tt as any, mocks.bc as any);
+      manager.spawn('/agent-a', 'workspace-a', undefined, undefined, 'gpt-5.5');
+      const agentId = 'mock-agent-uuid-001';
+
+      const jsonlLine = JSON.stringify({
+        type: 'message_end',
+        message: {
+          responseId: 'resp-with-cache-cost',
+          usage: {
+            input: 1000,
+            output: 250,
+            cacheRead: 3000,
+            cacheWrite: 400,
+            cost: {
+              input: 0.01,
+              output: 0.02,
+              cacheRead: 0.003,
+              cacheWrite: 0.004,
+              total: 0.037,
+            },
+          },
+        },
+      });
+
+      mockStdout.emit('data', Buffer.from(`${jsonlLine}\n`));
+
+      expect(mocks.tt.recordUsage).toHaveBeenCalledWith(
+        agentId,
+        1000,
+        250,
+        'gpt-5.5',
+        'workspace-a',
+        {
+          cacheReadTokens: 3000,
+          cacheWriteTokens: 400,
+          costUsd: 0.037,
+        },
+      );
+    });
+
+    it('should not double-count repeated RPC usage for the same response', () => {
+      const mocks = makeP3Mocks();
+      manager.injectDependencies(mocks.tt as any, mocks.bc as any);
+      manager.spawn('/agent-a', 'workspace-a', undefined, undefined, 'gpt-5.5');
+      const usageMessage = {
+        role: 'assistant',
+        usage: {
+          input: 28067,
+          output: 124,
+          totalTokens: 28191,
+        },
+        responseId: 'resp-tokenx24-smoke',
+      };
+      const chunk = [
+        JSON.stringify({ type: 'message_end', message: usageMessage }),
+        JSON.stringify({ type: 'turn_end', message: usageMessage }),
+      ].join('\n') + '\n';
+
+      mockStdout.emit('data', Buffer.from(chunk));
+
+      expect(mocks.tt.recordUsage).toHaveBeenCalledTimes(1);
+      expect(mocks.tt.recordUsage).toHaveBeenCalledWith(
+        'mock-agent-uuid-001',
+        28067,
+        124,
+        'gpt-5.5',
+        'workspace-a',
+      );
     });
 
     it('should prefer token_usage over usage format', () => {

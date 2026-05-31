@@ -58,6 +58,19 @@ export function useLayout() {
     activeAgentId.value = id;
   }
 
+  function ensureActiveAgent(agentIds: string[]): string | null {
+    if (agentIds.length === 0) {
+      activeAgentId.value = null;
+      return null;
+    }
+
+    if (!activeAgentId.value || !agentIds.includes(activeAgentId.value)) {
+      activeAgentId.value = agentIds[0];
+    }
+
+    return activeAgentId.value;
+  }
+
   function setLeftWidth(width: number): void {
     leftWidth.value = Math.max(LAYOUT.leftPanel.minWidth, Math.min(LAYOUT.leftPanel.maxWidth, width));
     persist();
@@ -87,6 +100,7 @@ export function useLayout() {
     setMode,
     toggleRightPanel,
     setActiveAgent,
+    ensureActiveAgent,
     setLeftWidth,
     setRightWidth,
     // Phase 2

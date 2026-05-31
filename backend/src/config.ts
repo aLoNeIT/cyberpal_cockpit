@@ -1,5 +1,11 @@
 import { homedir } from 'os';
-import { join } from 'path';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { resolveAgentArgsPrefix, resolveAgentCommand } from './utils/agentBinary.js';
+
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const backendRoot = resolve(currentDir, '..');
+const projectRoot = resolve(backendRoot, '..');
 
 export const CONFIG = {
   // 服务器
@@ -7,7 +13,9 @@ export const CONFIG = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
 
   // oh-my-pi
-  ohMyPiPath: process.env.OH_MY_PI_PATH || 'oh-my-pi',
+  ohMyPiPath: resolveAgentCommand(),
+  ohMyPiArgsPrefix: resolveAgentArgsPrefix(),
+  ohMyPiAgentDir: process.env.OH_MY_PI_AGENT_DIR || join(projectRoot, '.tmp', 'omp-agent', 'agent'),
   maxAgents: parseInt(process.env.MAX_AGENTS || '4', 10),
   agentSpawnTimeout: 10000,
 
