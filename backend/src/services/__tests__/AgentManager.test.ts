@@ -388,6 +388,24 @@ describe('AgentManager', () => {
       );
     });
 
+    it('should emit a user conversation event when sending input', () => {
+      const eventCallback = vi.fn();
+      manager.onProcessEvent = eventCallback;
+      manager.spawn('/test/cwd');
+
+      manager.sendStdin('mock-agent-uuid-001', 'test input');
+
+      expect(eventCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'mock-agent-uuid-001',
+          kind: 'user',
+          title: 'User',
+          content: 'test input',
+          status: 'completed',
+        }),
+      );
+    });
+
     it('should queue a second chat message as follow_up while the agent is busy', () => {
       manager.spawn('/test/cwd');
 
@@ -414,6 +432,23 @@ describe('AgentManager', () => {
       expect(mockStdin.write).toHaveBeenNthCalledWith(
         2,
         `${JSON.stringify({ type: 'follow_up', message: 'second input' })}\n`,
+      );
+    });
+
+    it('should release busy state on message_end so the next user prompt starts a new turn', () => {
+      manager.spawn('/test/cwd');
+
+      manager.sendStdin('mock-agent-uuid-001', 'first input');
+      mockStdout.emit('data', Buffer.from(`${JSON.stringify({ type: 'message_end', message: { content: 'first answer' } })}\n`));
+      manager.sendStdin('mock-agent-uuid-001', 'second input');
+
+      expect(mockStdin.write).toHaveBeenNthCalledWith(
+        1,
+        `${JSON.stringify({ type: 'prompt', message: 'first input' })}\n`,
+      );
+      expect(mockStdin.write).toHaveBeenNthCalledWith(
+        2,
+        `${JSON.stringify({ type: 'prompt', message: 'second input' })}\n`,
       );
     });
 

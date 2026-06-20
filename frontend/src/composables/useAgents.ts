@@ -10,6 +10,11 @@ export interface ConflictNotification {
   dismissed: boolean;
 }
 
+export interface SendState {
+  phase: 'sending' | 'busy' | 'error';
+  message: string;
+}
+
 function getErrorMessage(err: unknown): string {
   if (typeof err === 'object' && err !== null) {
     const response = (err as { response?: { data?: { message?: unknown } } }).response;
@@ -41,6 +46,7 @@ export function useAgents() {
   const terminalOutputs: Ref<Map<string, string>> = ref(new Map());
   const markdownOutputs: Ref<Map<string, string>> = ref(new Map());
   const conversationEvents: Ref<Map<string, AgentConversationEvent[]>> = ref(new Map());
+  const sendStates: Ref<Map<string, SendState>> = ref(new Map());
   const launchError: Ref<string | null> = ref(null);
 
   // Phase 2: 冲突通知列表
@@ -49,6 +55,86 @@ export function useAgents() {
   const agentList: ComputedRef<AgentInfo[]> = computed(() => {
     return Array.from(agents.value.values());
   });
+
+  function setSendState(id: string, phase: SendState['phase'], message: string): void {
+    sendStates.value.set(id, { phase, message });
+  }
+
+  function clearSendState(id: string): void {
+    sendStates.value.delete(id);
+  }
+
+  function markBusy(id: string, message: string): void {
+    const current = sendStates.value.get(id);
+    if (current?.phase === 'error') return;
+    sendStates.value.set(id, { phase: 'busy', message });
+  }
+
+  function markSendError(id: string, message: string): void {
+    setSendState(id, 'error', message);
+  }
+
+  function applySendStateFromEvent(event: AgentConversationEvent): void {
+    const current = sendStates.value.get(event.agentId);
+    if (current?.phase === 'error' && event.kind !== 'stderr') {
+      return;
+    }
+
+    switch (event.kind) {
+      case 'assistant':
+        if (event.status === 'completed') {
+          clearSendState(event.agentId);
+        } else if (event.status === 'error') {
+          markSendError(event.agentId, event.content || event.title || '发送失败');
+        } else {
+          markBusy(event.agentId, '等待 Agent 响应...');
+        }
+        return;
+      case 'summary':
+        if (event.status === 'completed') {
+          clearSendState(event.agentId);
+        }
+        return;
+      case 'user':
+        if (current?.phase !== 'error') {
+          setSendState(event.agentId, 'sending', '正在发送...');
+        }
+        return;
+      case 'thinking':
+        if (event.status === 'error') {
+          markSendError(event.agentId, event.content || event.title || '发送失败');
+        } else if (event.status === 'running' || event.status === 'pending') {
+          markBusy(event.agentId, '正在思考...');
+        }
+        return;
+      case 'working':
+        if (event.status === 'error') {
+          markSendError(event.agentId, event.content || event.title || '发送失败');
+        } else if (event.status === 'running' || event.status === 'pending') {
+          markBusy(event.agentId, '等待 Agent 响应...');
+        }
+        return;
+      case 'tool':
+        if (event.status === 'error') {
+          markSendError(event.agentId, event.content || `工具 ${event.title || 'Tool'} 失败`);
+        } else if (event.status === 'running' || event.status === 'pending') {
+          markBusy(event.agentId, `正在调用工具：${event.title || 'Tool'}`);
+        }
+        return;
+      case 'stderr':
+        markSendError(event.agentId, event.content || event.title || '发送失败');
+        return;
+      default:
+        return;
+    }
+  }
+
+  function rebuildSendStateFromEvents(agentId: string, events: AgentConversationEvent[]): void {
+    clearSendState(agentId);
+    for (const event of events) {
+      applySendStateFromEvent(event);
+    }
+  }
 
   async function createAgent(cwd: string, workspaceId?: string, model?: string): Promise<AgentInfo> {
     launchError.value = null;
@@ -65,6 +151,7 @@ export function useAgents() {
       terminalOutputs.value.set(agentWithDefaults.id, '');
       markdownOutputs.value.set(agentWithDefaults.id, '');
       conversationEvents.value.set(agentWithDefaults.id, []);
+      clearSendState(agentWithDefaults.id);
       return agentWithDefaults;
     } catch (err) {
       launchError.value = getErrorMessage(err);
@@ -90,6 +177,7 @@ export function useAgents() {
       terminalOutputs.value.set(agentWithDefaults.id, '');
       markdownOutputs.value.set(agentWithDefaults.id, '');
       conversationEvents.value.set(agentWithDefaults.id, []);
+      clearSendState(agentWithDefaults.id);
     }
 
     await Promise.all(loaded.map((agent) => loadAgentEvents(agent.id)));
@@ -100,6 +188,7 @@ export function useAgents() {
     const events = await api.fetchAgentEvents(agentId);
     conversationEvents.value.set(agentId, events);
     rebuildOutputsFromEvents(agentId, events);
+    rebuildSendStateFromEvents(agentId, events);
   }
 
   function clearLaunchError(): void {
@@ -112,6 +201,7 @@ export function useAgents() {
     terminalOutputs.value.delete(id);
     markdownOutputs.value.delete(id);
     conversationEvents.value.delete(id);
+    clearSendState(id);
     // 也从冲突列表中移除相关记录
     conflicts.value = conflicts.value.filter((c) => c.event.agentA !== id && c.event.agentB !== id);
   }
@@ -122,6 +212,17 @@ export function useAgents() {
 
     const markdownCurrent = markdownOutputs.value.get(id) || '';
     markdownOutputs.value.set(id, `${markdownCurrent}\n> ${input}\n\n`);
+
+    appendConversationEvent({
+      id: `local-user-${uuidv4()}`,
+      agentId: id,
+      kind: 'user',
+      title: 'User',
+      content: input,
+      status: 'completed',
+      metadata: { optimistic: true },
+      createdAt: Date.now(),
+    }, false);
   }
 
   function appendSendError(id: string, message: string): void {
@@ -130,9 +231,22 @@ export function useAgents() {
 
     const markdownCurrent = markdownOutputs.value.get(id) || '';
     markdownOutputs.value.set(id, `${markdownCurrent}\n\n**发送失败：${message}**\n`);
+
+    appendConversationEvent({
+      id: `local-send-error-${uuidv4()}`,
+      agentId: id,
+      kind: 'stderr',
+      title: '发送失败',
+      content: message,
+      status: 'error',
+      metadata: { local: true },
+      createdAt: Date.now(),
+    }, false);
+    markSendError(id, message);
   }
 
   function sendStdin(id: string, input: string): void {
+    setSendState(id, 'sending', '正在发送...');
     appendUserInput(id, input);
     api.sendStdin(id, input).then((result) => {
       if (result?.agent) {
@@ -142,6 +256,9 @@ export function useAgents() {
           childIds: result.agent.childIds ?? [],
           isOrphaned: result.agent.isOrphaned ?? false,
         });
+      }
+      if (sendStates.value.get(id)?.phase === 'sending') {
+        markBusy(id, '等待 Agent 响应...');
       }
     }).catch((err) => {
       console.error(`[useAgents] Failed to send stdin to agent ${id}:`, err);
@@ -172,8 +289,12 @@ export function useAgents() {
     if (current.some((item) => item.id === event.id)) {
       return false;
     }
+    if (isDuplicateOptimisticUserEvent(current, event)) {
+      return false;
+    }
 
     conversationEvents.value.set(event.agentId, [...current, event]);
+    applySendStateFromEvent(event);
     if (!updateTextOutputs) return true;
 
     if (event.kind === 'assistant' && event.content) {
@@ -183,6 +304,19 @@ export function useAgents() {
     }
 
     return true;
+  }
+
+  function isDuplicateOptimisticUserEvent(current: AgentConversationEvent[], event: AgentConversationEvent): boolean {
+    if (event.kind !== 'user') return false;
+    const now = event.createdAt || Date.now();
+    return current.some((item) => {
+      if (item.kind !== 'user') return false;
+      if (item.content !== event.content) return false;
+      if (item.agentId !== event.agentId) return false;
+      if (item.id === event.id) return true;
+      const optimistic = item.metadata && (item.metadata as { optimistic?: unknown }).optimistic === true;
+      return optimistic && Math.abs(now - item.createdAt) < 5000;
+    });
   }
 
   function rebuildOutputsFromEvents(agentId: string, events: AgentConversationEvent[]): void {
@@ -248,6 +382,7 @@ export function useAgents() {
     terminalOutputs.value.set(id, '');
     markdownOutputs.value.set(id, '');
     conversationEvents.value.set(id, []);
+    clearSendState(id);
   }
 
   // ═══════════ Phase 2: 新增方法 ═══════════
@@ -418,6 +553,7 @@ export function useAgents() {
     terminalOutputs,
     markdownOutputs,
     conversationEvents,
+    sendStates,
     launchError,
     conflicts,
     activeConflicts,

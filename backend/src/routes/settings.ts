@@ -52,6 +52,7 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         name: created.name,
         baseUrl: created.baseUrl,
         apiKey: '',
+        visible: created.visible !== false,
         models: [],
       };
       const response: ApiResponse<ProviderDetail> = { code: 0, data: detail, message: '提供商创建成功' };
@@ -102,6 +103,7 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         name: updated.name,
         baseUrl: updated.baseUrl,
         apiKey: updated.apiKey ? updated.apiKey.slice(0, 4) + '****' + updated.apiKey.slice(-4) : '',
+        visible: updated.visible !== false,
         models: updated.models.map((m) => ({ ...m })),
       };
 
@@ -135,6 +137,7 @@ export function createSettingsRoutes(providerConfigService: ProviderConfigServic
         name: updated.name,
         baseUrl: updated.baseUrl,
         apiKey: apiKey ? apiKey.slice(0, 4) + '****' + apiKey.slice(-4) : '',
+        visible: updated.visible !== false,
         models: updated.models.map((m) => ({ ...m })),
       };
 

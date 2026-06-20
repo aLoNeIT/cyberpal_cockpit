@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue';
+import { computed, ref, watch, inject } from 'vue';
 import type { AgentConversationEvent, AgentInfo, ModelInfo } from '@/types';
 import AgentTerminal from './AgentTerminal.vue';
 import AgentMarkdown from './AgentMarkdown.vue';
@@ -10,12 +10,14 @@ import StatusBadge from '@/components/common/StatusBadge.vue';
 import ModelSelector from './ModelSelector.vue';
 import type { useAgents } from '@/composables/useAgents';
 import type { useBudget } from '@/composables/useBudget';
+import { getModelSelector, resolveModelSelector } from '@/utils/modelSelector';
 
 const props = defineProps<{
   agent: AgentInfo;
   terminalOutput: string;
   markdownOutput: string;
   conversationEvents: AgentConversationEvent[];
+  sendState?: { phase: 'sending' | 'busy' | 'error'; message: string } | null;
 }>();
 
 const emit = defineEmits<{
@@ -39,14 +41,8 @@ function onKill(): void {
   emit('kill');
 }
 
-function toggleViewMode(): void {
-  if (viewMode.value === 'process') {
-    viewMode.value = 'terminal';
-  } else if (viewMode.value === 'terminal') {
-    viewMode.value = 'markdown';
-  } else {
-    viewMode.value = 'process';
-  }
+function setViewMode(mode: 'process' | 'terminal' | 'markdown'): void {
+  viewMode.value = mode;
 }
 
 function toggleModelPicker(): void {
@@ -70,17 +66,30 @@ watch(() => props.terminalOutput, () => {
   }
 });
 
-const displayName = props.agent.cwd.split(/[/\\]/).filter(Boolean).pop() || props.agent.cwd;
-const isWorker = props.agent.parentId !== null;
-const isRestarting = props.agent.status === 'restarting';
-const isRunning = props.agent.status === 'running';
+const displayName = computed(() => props.agent.cwd.split(/[/\\]/).filter(Boolean).pop() || props.agent.cwd);
+const isWorker = computed(() => props.agent.parentId !== null);
+const isRestarting = computed(() => props.agent.status === 'restarting');
+const isRunning = computed(() => props.agent.status === 'running');
+const sendStateLabel = computed(() => {
+  if (!props.sendState) return '';
+  if (props.sendState.phase === 'sending') return '正在发送...';
+  if (props.sendState.phase === 'busy') return props.sendState.message || '等待 Agent 响应...';
+  return props.sendState.message || '发送失败';
+});
+const canAcceptInput = computed(() => {
+  return props.agent.status === 'running' || (props.agent.status === 'stopped' && !!props.agent.sessionFile);
+});
 
-const availableModels = budget?.models.value || [];
+const availableModels = computed<ModelInfo[]>(() => budget?.models.value ?? []);
+const visibleModels = computed<ModelInfo[]>(() => availableModels.value.filter((m) => m.visible !== false));
+const currentModelSelector = computed(() => {
+  return resolveModelSelector(availableModels.value, props.agent.model);
+});
 </script>
 
 <template>
   <div
-    class="flex flex-col bg-cockpit-panel rounded-md overflow-hidden min-h-0 transition-shadow duration-200"
+    class="relative flex flex-col bg-cockpit-panel rounded-md overflow-hidden min-h-0 transition-shadow duration-200"
     :class="[
       isWorker
         ? 'border border-dashed border-cockpit-warning/50'
@@ -107,20 +116,42 @@ const availableModels = budget?.models.value || [];
       <div class="flex items-center gap-1 flex-shrink-0">
         <!-- Phase 3: 切换模型按钮 -->
         <button
-          v-if="agent.status === 'running' && availableModels.length > 1"
+          v-if="agent.status === 'running' && visibleModels.length > 1"
           class="text-2xs px-1.5 py-0.5 rounded-sm text-cockpit-muted hover:text-cockpit-accent hover:bg-cockpit-accent-subtle transition-colors duration-150"
           title="切换模型"
           @click="toggleModelPicker"
         >
           &#x1F504;
         </button>
-        <button
-          class="text-2xs px-1.5 py-0.5 rounded-sm text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover transition-colors duration-150"
-          @click="toggleViewMode"
-          :title="viewMode === 'process' ? '切换到终端视图' : viewMode === 'terminal' ? '切换到 Markdown 视图' : '切换到过程视图'"
-        >
-          {{ viewMode === 'process' ? '>_' : viewMode === 'terminal' ? 'MD' : '流程' }}
-        </button>
+        <div class="flex items-center overflow-hidden rounded-sm border border-cockpit-border bg-cockpit-surface-sunken">
+          <button
+            data-testid="view-process"
+            class="text-2xs px-1.5 py-0.5 transition-colors duration-150"
+            :class="viewMode === 'process' ? 'bg-cockpit-accent text-white' : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover'"
+            title="过程视图"
+            @click="setViewMode('process')"
+          >
+            流程
+          </button>
+          <button
+            data-testid="view-terminal"
+            class="text-2xs px-1.5 py-0.5 border-l border-cockpit-border transition-colors duration-150"
+            :class="viewMode === 'terminal' ? 'bg-cockpit-accent text-white' : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover'"
+            title="终端视图"
+            @click="setViewMode('terminal')"
+          >
+            &gt;_
+          </button>
+          <button
+            data-testid="view-markdown"
+            class="text-2xs px-1.5 py-0.5 border-l border-cockpit-border transition-colors duration-150"
+            :class="viewMode === 'markdown' ? 'bg-cockpit-accent text-white' : 'text-cockpit-muted hover:text-cockpit-text hover:bg-cockpit-surface-hover'"
+            title="Markdown 视图"
+            @click="setViewMode('markdown')"
+          >
+            MD
+          </button>
+        </div>
         <button
           class="text-2xs px-1.5 py-0.5 rounded-sm text-cockpit-muted hover:text-cockpit-danger hover:bg-cockpit-danger-subtle transition-colors duration-150"
           @click="onKill"
@@ -131,12 +162,17 @@ const availableModels = budget?.models.value || [];
       </div>
     </div>
 
+    <div v-if="sendState" class="border-b border-cockpit-border bg-cockpit-bg/80 px-3 py-1.5 text-[11px] leading-4 flex items-center gap-2" :class="sendState.phase === 'error' ? 'text-cockpit-danger' : 'text-cockpit-muted'">
+      <span class="inline-block h-1.5 w-1.5 rounded-full" :class="sendState.phase === 'error' ? 'bg-cockpit-danger' : sendState.phase === 'busy' ? 'bg-cockpit-warning' : 'bg-cockpit-accent'"></span>
+      {{ sendStateLabel }}
+    </div>
+
     <!-- Phase 3: 模型选择浮层 -->
     <div v-if="showModelPicker" class="absolute z-20 right-2 top-8 bg-cockpit-panel border border-cockpit-border rounded-md shadow-cockpit-lg p-2 w-56">
       <div class="type-overline mb-1.5">选择模型</div>
       <ModelSelector
-        :models="availableModels"
-        :current-model="agent.model"
+        :models="visibleModels"
+        :current-model="currentModelSelector"
         mode="list"
         @select="onSelectModel"
       />
@@ -168,9 +204,9 @@ const availableModels = budget?.models.value || [];
     </div>
 
     <!-- 输入条 -->
-    <div class="flex-shrink-0" v-if="agent.status === 'running'">
+    <div class="flex-shrink-0" v-if="canAcceptInput">
       <AgentInput
-        :disabled="agent.status !== 'running'"
+        :disabled="!canAcceptInput"
         @send="onSendInput"
       />
     </div>

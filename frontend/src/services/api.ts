@@ -161,7 +161,7 @@ export async function fetchProviderDetail(id: string): Promise<ProviderDetail> {
 
 export async function updateProvider(
   id: string,
-  req: { name?: string; baseUrl?: string; apiKey?: string; models?: ProviderModel[] },
+  req: { name?: string; baseUrl?: string; apiKey?: string; visible?: boolean; models?: ProviderModel[] },
 ): Promise<ProviderDetail> {
   const res = await http.put<ApiResponse<ProviderDetail>>(`/settings/providers/${id}`, req);
   return res.data.data;

@@ -124,6 +124,9 @@ function handleAgentEvent(message: WSMessage): void {
   const added = agents.appendConversationEvent(msg.payload, false);
   if (added && msg.payload.kind === 'assistant' && msg.payload.content) {
     agents.appendFormalOutput(msg.agentId, msg.payload.content);
+    if (msg.payload.status === 'completed') {
+      agents.appendOutput(msg.agentId, msg.payload.content, false);
+    }
   }
 }
 
@@ -383,6 +386,7 @@ function onIrcFilterChange(filter: Partial<IrcFilter>): void {
           :terminal-outputs="agents.terminalOutputs.value"
           :markdown-outputs="agents.markdownOutputs.value"
           :conversation-events="agents.conversationEvents.value"
+          :send-states="agents.sendStates.value"
           @tab-click="onTabClick"
           @tab-close="onTabClose"
           @send-input="onSendInput"

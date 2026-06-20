@@ -22,14 +22,16 @@ describe('ProviderConfig', () => {
       name: 'TokenX24',
       baseUrl: 'https://tokenx24.com/v1',
       apiKey: 'shif********baba',
-      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true }],
+      visible: true,
+      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true, visible: true }],
     });
     vi.mocked(api.updateProvider).mockResolvedValue({
       id: 'tokenx24',
       name: 'TokenX24',
       baseUrl: 'https://tokenx24.com/v1',
       apiKey: 'shif********baba',
-      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true }],
+      visible: true,
+      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true, visible: true }],
     });
   });
 
@@ -50,7 +52,8 @@ describe('ProviderConfig', () => {
     expect(api.updateProvider).toHaveBeenCalledWith('tokenx24', {
       name: 'TokenX24',
       baseUrl: 'https://tokenx24.com/v1',
-      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true }],
+      visible: true,
+      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true, visible: true }],
     });
   });
 
@@ -70,7 +73,37 @@ describe('ProviderConfig', () => {
       name: 'TokenX24',
       baseUrl: 'https://tokenx24.com/v1',
       apiKey: 'new-raw-token',
-      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true }],
+      visible: true,
+      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true, visible: true }],
     });
+  });
+
+  it('sends model visibility changes when saving provider settings', async () => {
+    const wrapper = mount(ProviderConfig);
+    await flushPromises();
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === '保存');
+    expect(saveButton).toBeTruthy();
+    await saveButton!.trigger('click');
+    await flushPromises();
+
+    expect(api.updateProvider).toHaveBeenCalledWith('tokenx24', {
+      name: 'TokenX24',
+      baseUrl: 'https://tokenx24.com/v1',
+      visible: true,
+      models: [{ id: 'gpt-5.5', name: 'GPT-5.5', isDefault: true, visible: true }],
+    });
+  });
+
+  it('toggles provider visibility in the detail panel', async () => {
+    const wrapper = mount(ProviderConfig);
+    await flushPromises();
+
+    const visibilityLabel = wrapper.get('[data-testid="provider-visibility-state"]');
+    expect(visibilityLabel.text()).toContain('显示');
+
+    await wrapper.get('[data-testid="provider-visibility-toggle"]').trigger('click');
+
+    expect(visibilityLabel.text()).toContain('隐藏');
   });
 });

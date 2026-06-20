@@ -85,6 +85,7 @@ export interface ProviderModel {
   id: string;
   name: string;
   isDefault?: boolean;
+  visible?: boolean;
 }
 
 export interface ProviderSummary {
@@ -92,6 +93,7 @@ export interface ProviderSummary {
   name: string;
   configured: boolean;
   modelCount: number;
+  visible?: boolean;
 }
 
 export interface ProviderDetail {
@@ -99,6 +101,7 @@ export interface ProviderDetail {
   name: string;
   baseUrl: string;
   apiKey: string;
+  visible?: boolean;
   models: ProviderModel[];
 }
 
@@ -211,6 +214,10 @@ export interface ModelInfo {
   name: string;
   provider: string;
   isDefault: boolean;
+  providerId?: string;
+  modelId?: string;
+  selector?: string;
+  visible?: boolean;
 }
 
 export type WSMessageType =

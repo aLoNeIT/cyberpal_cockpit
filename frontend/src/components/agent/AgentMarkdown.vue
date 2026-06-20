@@ -1,31 +1,21 @@
 <script setup lang="ts">
-import { watch, ref } from 'vue';
+import { computed } from 'vue';
+import { renderMarkdown } from '@/utils/markdown';
 
 const props = defineProps<{
   content: string;
 }>();
 
-const displayContent = ref('');
-
-// 模拟流式渲染：逐步增加内容
-let animationId: ReturnType<typeof requestAnimationFrame> | null = null;
-
-watch(() => props.content, (newVal) => {
-  if (animationId) {
-    cancelAnimationFrame(animationId);
-  }
-  // 直接显示全部内容（markstream-vue 库内部处理流式效果）
-  displayContent.value = newVal;
-});
+const renderedContent = computed(() => renderMarkdown(props.content));
 </script>
 
 <template>
   <div class="h-full overflow-y-auto p-4">
     <div
       class="prose-container"
-      v-html="displayContent"
+      v-html="renderedContent"
     ></div>
-    <div v-if="!displayContent" class="text-cockpit-muted text-sm text-center mt-4">
+    <div v-if="!renderedContent" class="text-cockpit-muted text-sm text-center mt-4">
       等待 Markdown 输出...
     </div>
   </div>

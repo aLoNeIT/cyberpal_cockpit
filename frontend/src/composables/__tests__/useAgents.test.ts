@@ -282,7 +282,7 @@ describe('useAgents', () => {
         }),
       );
 
-      const { agents, terminalOutputs, markdownOutputs, sendStdin } = useAgents();
+      const { agents, terminalOutputs, markdownOutputs, conversationEvents, sendStates, sendStdin } = useAgents();
       agents.value.set('agent-1', createMockAgent('agent-1'));
       terminalOutputs.value.set('agent-1', '');
       markdownOutputs.value.set('agent-1', '');
@@ -296,6 +296,126 @@ describe('useAgents', () => {
       await vi.waitFor(() => {
         expect(mockApi.sendStdin).toHaveBeenCalledWith('agent-1', 'Build the feature');
       });
+    });
+
+    it('should immediately append user input to the process conversation', () => {
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      const { agents, conversationEvents, sendStdin } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      conversationEvents.value.set('agent-1', []);
+
+      sendStdin('agent-1', 'Build the feature');
+
+      expect(conversationEvents.value.get('agent-1')).toMatchObject([
+        {
+          agentId: 'agent-1',
+          kind: 'user',
+          title: 'User',
+          content: 'Build the feature',
+          status: 'completed',
+        },
+      ]);
+    });
+
+    it('should expose sending and busy feedback around stdin requests', async () => {
+      let resolveSend: (() => void) | undefined;
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
+      );
+
+      const { agents, conversationEvents, sendStates, sendStdin } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      conversationEvents.value.set('agent-1', []);
+
+      sendStdin('agent-1', 'Build the feature');
+
+      expect(sendStates.value.get('agent-1')).toMatchObject({
+        phase: 'sending',
+        message: '正在发送...',
+      });
+
+      resolveSend?.();
+
+      await vi.waitFor(() => {
+        expect(sendStates.value.get('agent-1')).toMatchObject({
+          phase: 'busy',
+          message: '等待 Agent 响应...',
+        });
+      });
+    });
+
+    it('should update send feedback from streamed process events and clear it after final assistant output', () => {
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      const { conversationEvents, sendStates, appendConversationEvent } = useAgents();
+      conversationEvents.value.set('agent-1', []);
+
+      appendConversationEvent({
+        id: 'thinking-1',
+        agentId: 'agent-1',
+        kind: 'thinking',
+        title: 'Thinking',
+        content: 'checking files',
+        status: 'running',
+        createdAt: 1,
+      }, false);
+
+      expect(sendStates.value.get('agent-1')).toMatchObject({
+        phase: 'busy',
+        message: '正在思考...',
+      });
+
+      appendConversationEvent({
+        id: 'tool-1',
+        agentId: 'agent-1',
+        kind: 'tool',
+        title: 'shell_command',
+        content: 'npm test',
+        status: 'running',
+        createdAt: 2,
+      }, false);
+
+      expect(sendStates.value.get('agent-1')).toMatchObject({
+        phase: 'busy',
+        message: '正在调用工具：shell_command',
+      });
+
+      appendConversationEvent({
+        id: 'assistant-final',
+        agentId: 'agent-1',
+        kind: 'assistant',
+        title: 'Assistant',
+        content: 'Done',
+        status: 'completed',
+        createdAt: 3,
+      }, false);
+
+      expect(sendStates.value.has('agent-1')).toBe(false);
+    });
+
+    it('should deduplicate the backend user event that confirms an optimistic send', () => {
+      (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      const { agents, conversationEvents, sendStdin, appendConversationEvent } = useAgents();
+      agents.value.set('agent-1', createMockAgent('agent-1'));
+      conversationEvents.value.set('agent-1', []);
+
+      sendStdin('agent-1', 'Build the feature');
+
+      appendConversationEvent({
+        id: 'server-user-1',
+        agentId: 'agent-1',
+        kind: 'user',
+        title: 'User',
+        content: 'Build the feature',
+        status: 'completed',
+        createdAt: Date.now() + 25,
+      }, false);
+
+      expect(conversationEvents.value.get('agent-1')).toHaveLength(1);
     });
 
     it('should keep user input before streamed agent output', () => {
@@ -318,7 +438,7 @@ describe('useAgents', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       (mockApi.sendStdin as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Send failed'));
 
-      const { agents, terminalOutputs, markdownOutputs, sendStdin } = useAgents();
+      const { agents, terminalOutputs, markdownOutputs, conversationEvents, sendStates, sendStdin } = useAgents();
       agents.value.set('agent-1', createMockAgent('agent-1'));
       terminalOutputs.value.set('agent-1', '');
       markdownOutputs.value.set('agent-1', '');
@@ -331,6 +451,21 @@ describe('useAgents', () => {
 
       expect(terminalOutputs.value.get('agent-1')).toContain('[发送失败] Send failed');
       expect(markdownOutputs.value.get('agent-1')).toContain('发送失败：Send failed');
+      expect(conversationEvents.value.get('agent-1')).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            agentId: 'agent-1',
+            kind: 'stderr',
+            title: '发送失败',
+            content: 'Send failed',
+            status: 'error',
+          }),
+        ]),
+      );
+      expect(sendStates.value.get('agent-1')).toMatchObject({
+        phase: 'error',
+        message: 'Send failed',
+      });
 
       consoleSpy.mockRestore();
     });
@@ -732,6 +867,7 @@ describe('useAgents', () => {
     });
 
     it('should set status to error on failed restart', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       (mockApi.restartAgent as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
 
       const { agents, restartAgent } = useAgents();
@@ -739,6 +875,8 @@ describe('useAgents', () => {
 
       await expect(restartAgent('agent-1', 'claude-3-opus')).rejects.toThrow('Network error');
       expect(agents.value.get('agent-1')?.status).toBe('error');
+
+      consoleSpy.mockRestore();
     });
   });
 
@@ -764,8 +902,11 @@ describe('useAgents', () => {
 
   describe('handle429', () => {
     it('should log warning and not throw', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { handle429 } = useAgents();
       expect(() => handle429('Budget exceeded')).not.toThrow();
+      expect(consoleSpy).toHaveBeenCalledWith('[useAgents] Budget exceeded: Budget exceeded');
+      consoleSpy.mockRestore();
     });
   });
 });

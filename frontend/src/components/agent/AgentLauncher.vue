@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue';
 import type { WorkspaceConfig, ModelInfo } from '@/types';
 import * as api from '@/services/api';
 import ModelSelector from './ModelSelector.vue';
+import { getModelSelector, resolveModelSelector } from '@/utils/modelSelector';
 
 const props = defineProps<{
   workspaces: WorkspaceConfig[];
@@ -23,13 +24,19 @@ const errorMsg = ref('');
 const models = ref<ModelInfo[]>([]);
 const selectedModel = ref<string | undefined>(undefined);
 const modelsLoading = ref(false);
+const visibleModels = computed(() => models.value.filter((m) => m.visible !== false));
 
 onMounted(async () => {
   modelsLoading.value = true;
   try {
     models.value = await api.fetchModels();
-    const defaultModel = models.value.find((m) => m.isDefault);
-    selectedModel.value = defaultModel?.id;
+    const defaultModel = visibleModels.value.find((m) => m.isDefault);
+    const fallbackModel = visibleModels.value[0];
+    selectedModel.value = defaultModel
+      ? resolveModelSelector(visibleModels.value, getModelSelector(defaultModel))
+      : fallbackModel
+        ? resolveModelSelector(visibleModels.value, getModelSelector(fallbackModel))
+        : undefined;
   } catch {
     console.warn('[AgentLauncher] Failed to load models');
   } finally {
@@ -134,13 +141,14 @@ function handleCancel(): void {
       <div class="px-4 pb-3">
         <label class="text-xs text-cockpit-muted block mb-1">模型</label>
         <ModelSelector
-          v-if="models.length > 0"
-          :models="models"
+          v-if="visibleModels.length > 0"
+          :models="visibleModels"
           :current-model="selectedModel"
           mode="dropdown"
           @select="(id) => selectedModel = id"
         />
         <span v-else-if="modelsLoading" class="text-xs text-cockpit-muted">正在加载模型列表...</span>
+        <span v-else class="text-xs text-cockpit-muted">没有可用模型</span>
       </div>
 
       <div class="flex justify-end gap-2 px-4 py-3 border-t border-cockpit-border">

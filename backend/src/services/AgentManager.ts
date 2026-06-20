@@ -634,6 +634,10 @@ export class AgentManager {
         this.emitTurnSummary(agentId, parsed);
         return;
 
+      case 'message_end':
+        this.busyAgents.delete(agentId);
+        return;
+
       case 'message_update': {
         const assistantEvent = parsed.assistantMessageEvent;
         if (!assistantEvent) return;

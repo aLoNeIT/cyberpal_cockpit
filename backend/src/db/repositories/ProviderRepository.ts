@@ -12,6 +12,7 @@ interface ProviderRow {
   name: string;
   base_url: string;
   api_key: string;
+  visible: number;
   models: string; // JSON string
   created_at: number;
   updated_at: number;
@@ -51,9 +52,9 @@ export class ProviderRepository {
     const modelsJson = JSON.stringify(config.models);
     const now = Date.now();
     await this.db.execute(
-      `INSERT INTO provider_configs (id, name, base_url, api_key, models, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, config.name, config.baseUrl, config.apiKey, modelsJson, now, now]
+      `INSERT INTO provider_configs (id, name, base_url, api_key, visible, models, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, config.name, config.baseUrl, config.apiKey, config.visible === false ? 0 : 1, modelsJson, now, now]
     );
   }
 
@@ -62,6 +63,7 @@ export class ProviderRepository {
     name?: string;
     baseUrl?: string;
     apiKey?: string;
+    visible?: boolean;
     models?: ProviderModel[];
   }): Promise<boolean> {
     const existing = await this.db.queryOne<ProviderRow>(
@@ -73,15 +75,16 @@ export class ProviderRepository {
     const name = partial.name ?? existing.name;
     const baseUrl = partial.baseUrl ?? existing.base_url;
     const apiKey = partial.apiKey !== undefined ? partial.apiKey : existing.api_key;
+    const visible = partial.visible !== undefined ? (partial.visible ? 1 : 0) : existing.visible;
     const modelsJson = partial.models !== undefined
       ? JSON.stringify(partial.models)
       : existing.models;
 
     await this.db.execute(
       `UPDATE provider_configs
-       SET name = ?, base_url = ?, api_key = ?, models = ?, updated_at = ?
+       SET name = ?, base_url = ?, api_key = ?, visible = ?, models = ?, updated_at = ?
        WHERE id = ?`,
-      [name, baseUrl, apiKey, modelsJson, Date.now(), id]
+      [name, baseUrl, apiKey, visible, modelsJson, Date.now(), id]
     );
     return true;
   }
@@ -141,6 +144,7 @@ export class ProviderRepository {
       name: row.name,
       baseUrl: row.base_url,
       apiKey: row.api_key,
+      visible: row.visible !== 0,
       models,
     };
   }

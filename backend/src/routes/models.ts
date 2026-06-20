@@ -12,10 +12,6 @@ export function createModelRoutes(providerConfigService?: ProviderConfigService)
 
       if (providerConfigService) {
         models = providerConfigService.getMergedModels();
-        // 如果合并后为空，回退到硬编码列表
-        if (models.length === 0) {
-          models = getDefaultModels();
-        }
       } else {
         models = getDefaultModels();
       }
@@ -34,13 +30,13 @@ export function createModelRoutes(providerConfigService?: ProviderConfigService)
 /** 默认硬编码模型列表（兜底） */
 function getDefaultModels(): ModelInfo[] {
   return [
-    { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'DeepSeek', isDefault: true },
-    { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'DeepSeek', isDefault: false },
-    { id: 'qwen-plus', name: 'Qwen Plus', provider: 'Alibaba', isDefault: false },
-    { id: 'qwen-max', name: 'Qwen Max', provider: 'Alibaba', isDefault: false },
-    { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', isDefault: false },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', isDefault: false },
-    { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', isDefault: false },
-    { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', isDefault: false },
+    { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'DeepSeek', isDefault: true, providerId: 'deepseek', modelId: 'deepseek-chat', selector: 'deepseek/deepseek-chat', visible: true },
+    { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'DeepSeek', isDefault: false, providerId: 'deepseek', modelId: 'deepseek-reasoner', selector: 'deepseek/deepseek-reasoner', visible: true },
+    { id: 'qwen-plus', name: 'Qwen Plus', provider: 'Alibaba', isDefault: false, providerId: 'alibaba', modelId: 'qwen-plus', selector: 'alibaba/qwen-plus', visible: true },
+    { id: 'qwen-max', name: 'Qwen Max', provider: 'Alibaba', isDefault: false, providerId: 'alibaba', modelId: 'qwen-max', selector: 'alibaba/qwen-max', visible: true },
+    { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', isDefault: false, providerId: 'openai', modelId: 'gpt-4o', selector: 'openai/gpt-4o', visible: true },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', isDefault: false, providerId: 'openai', modelId: 'gpt-4o-mini', selector: 'openai/gpt-4o-mini', visible: true },
+    { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', isDefault: false, providerId: 'anthropic', modelId: 'claude-3.5-sonnet', selector: 'anthropic/claude-3.5-sonnet', visible: true },
+    { id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', isDefault: false, providerId: 'anthropic', modelId: 'claude-3-opus', selector: 'anthropic/claude-3-opus', visible: true },
   ];
 }

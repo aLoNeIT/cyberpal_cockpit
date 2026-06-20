@@ -15,11 +15,33 @@ describe('Model Routes', () => {
   // ============ GET /api/models ============
 
   describe('GET /api/models', () => {
-    it('should return 8 models', async () => {
+    it('should return models with stable selectors and visibility', async () => {
       const res = await request(app).get('/api/models').expect(200);
 
       expect(res.body.code).toBe(0);
       expect(res.body.data).toHaveLength(8);
+      expect(res.body.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'deepseek-chat',
+          providerId: 'deepseek',
+          modelId: 'deepseek-chat',
+          selector: 'deepseek/deepseek-chat',
+          visible: true,
+        }),
+      ]));
+    });
+
+    it('should return an empty list when every provider is hidden via service filtering', async () => {
+      const router = createModelRoutes({
+        getMergedModels: () => [],
+      } as any);
+      const hiddenApp = express();
+      hiddenApp.use('/api', router);
+
+      const res = await request(hiddenApp).get('/api/models').expect(200);
+
+      expect(res.body.code).toBe(0);
+      expect(res.body.data).toEqual([]);
     });
 
     it('should include default model marked as isDefault', async () => {
@@ -38,6 +60,10 @@ describe('Model Routes', () => {
         expect(model).toHaveProperty('name');
         expect(model).toHaveProperty('provider');
         expect(model).toHaveProperty('isDefault');
+        expect(model).toHaveProperty('selector');
+        expect(model).toHaveProperty('providerId');
+        expect(model).toHaveProperty('modelId');
+        expect(model).toHaveProperty('visible');
         expect(typeof model.id).toBe('string');
         expect(typeof model.name).toBe('string');
         expect(typeof model.provider).toBe('string');

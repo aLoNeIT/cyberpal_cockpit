@@ -5,6 +5,7 @@ import AgentTabBar from '@/components/agent/AgentTabBar.vue';
 import AgentCell from '@/components/agent/AgentCell.vue';
 import type { AgentConversationEvent, AgentInfo } from '@/types';
 import type { LayoutMode } from '@/composables/useLayout';
+import type { SendState } from '@/composables/useAgents';
 
 const props = defineProps<{
   mode: LayoutMode;
@@ -13,6 +14,7 @@ const props = defineProps<{
   terminalOutputs: Map<string, string>;
   markdownOutputs: Map<string, string>;
   conversationEvents: Map<string, AgentConversationEvent[]>;
+  sendStates: Map<string, SendState>;
 }>();
 
 const emit = defineEmits<{
@@ -55,9 +57,11 @@ function emitActiveAgentKill(): void {
     <AgentGrid
       v-if="mode === 'grid'"
       :agents="agents"
+      :active-agent-id="activeAgentId"
       :terminal-outputs="terminalOutputs"
       :markdown-outputs="markdownOutputs"
       :conversation-events="conversationEvents"
+      :send-states="sendStates"
       @send-input="(agentId, input) => emit('send-input', agentId, input)"
       @kill-agent="(id) => emit('kill-agent', id)"
     />
@@ -70,6 +74,7 @@ function emitActiveAgentKill(): void {
         :terminal-output="terminalOutputs.get(activeAgent.id) || ''"
         :markdown-output="markdownOutputs.get(activeAgent.id) || ''"
         :conversation-events="conversationEvents.get(activeAgent.id) || []"
+        :send-state="sendStates.get(activeAgent.id) || null"
         @send-input="emitActiveAgentInput"
         @kill="emitActiveAgentKill"
       />

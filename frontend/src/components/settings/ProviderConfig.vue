@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import type { ProviderSummary, ProviderDetail, ProviderModel } from '@/types';
 import * as api from '@/services/api';
+import { getModelSelector } from '@/utils/modelSelector';
 
 const BUILTINS = ['deepseek', 'openai', 'alibaba', 'anthropic'];
 
@@ -17,6 +18,7 @@ const successMsg = ref('');
 const editName = ref('');
 const editBaseUrl = ref('');
 const editApiKey = ref('');
+const editVisible = ref(true);
 const showApiKey = ref(false);
 const editModels = ref<ProviderModel[]>([]);
 const newModelId = ref('');
@@ -26,6 +28,7 @@ const newModelName = ref('');
 const originalName = ref('');
 const originalBaseUrl = ref('');
 const originalApiKey = ref('');
+const originalVisible = ref(true);
 const originalModels = ref<ProviderModel[]>([]);
 
 // ====== 添加 Provider 表单 ======
@@ -72,10 +75,12 @@ async function loadDetail(id: string): Promise<void> {
     editName.value = detail.name;
     editBaseUrl.value = detail.baseUrl;
     editApiKey.value = detail.apiKey;
+    editVisible.value = detail.visible !== false;
     editModels.value = detail.models.map((m) => ({ ...m }));
     originalName.value = detail.name;
     originalBaseUrl.value = detail.baseUrl;
     originalApiKey.value = detail.apiKey;
+    originalVisible.value = detail.visible !== false;
     originalModels.value = detail.models.map((m) => ({ ...m }));
   } catch (err) {
     errorMsg.value = '加载提供商详情失败';
@@ -96,9 +101,10 @@ async function handleSave(): Promise<void> {
   errorMsg.value = '';
   successMsg.value = '';
   try {
-    const payload: { name: string; baseUrl: string; apiKey?: string; models: ProviderModel[] } = {
+    const payload: { name: string; baseUrl: string; apiKey?: string; visible: boolean; models: ProviderModel[] } = {
       name: editName.value,
       baseUrl: editBaseUrl.value,
+      visible: editVisible.value,
       models: editModels.value,
     };
 
@@ -110,10 +116,12 @@ async function handleSave(): Promise<void> {
     editName.value = detail.name;
     editBaseUrl.value = detail.baseUrl;
     editApiKey.value = detail.apiKey;
+    editVisible.value = detail.visible !== false;
     editModels.value = detail.models.map((m) => ({ ...m }));
     originalName.value = detail.name;
     originalBaseUrl.value = detail.baseUrl;
     originalApiKey.value = detail.apiKey;
+    originalVisible.value = detail.visible !== false;
     originalModels.value = detail.models.map((m) => ({ ...m }));
     await loadProviders();
     successMsg.value = '保存成功';
@@ -130,6 +138,7 @@ function handleReset(): void {
   editName.value = originalName.value;
   editBaseUrl.value = originalBaseUrl.value;
   editApiKey.value = originalApiKey.value;
+  editVisible.value = originalVisible.value;
   editModels.value = originalModels.value.map((m) => ({ ...m }));
   showApiKey.value = false;
   errorMsg.value = '';
@@ -198,8 +207,27 @@ function removeModel(index: number): void {
 
 function setDefaultModel(modelId: string): void {
   for (const m of editModels.value) {
-    m.isDefault = m.id === modelId;
+    m.isDefault = getModelSelector(m as any) === modelId;
   }
+}
+
+function toggleModelVisibility(index: number): void {
+  const model = editModels.value[index];
+  if (!model) return;
+  model.visible = model.visible === false;
+}
+
+function isVisible(model: ProviderModel): boolean {
+  return model.visible !== false;
+}
+
+function getDefaultModelSelector(): string {
+  const model = editModels.value.find((m) => m.isDefault) ?? editModels.value[0];
+  return model ? getModelSelector(model as any) : '';
+}
+
+function toggleProviderVisibility(): void {
+  editVisible.value = !editVisible.value;
 }
 
 onMounted(() => {
@@ -275,6 +303,9 @@ onMounted(() => {
             <div class="text-2xs" :class="p.configured ? 'text-cockpit-success' : 'text-cockpit-muted'">
               {{ p.configured ? '已配置' : '未配置' }}
             </div>
+            <div class="text-2xs" :class="p.visible !== false ? 'text-cockpit-success' : 'text-cockpit-muted'">
+              {{ p.visible !== false ? '显示' : '隐藏' }}
+            </div>
           </div>
         </div>
         <span class="text-2xs text-cockpit-muted flex-shrink-0 ml-1">{{ p.modelCount }}</span>
@@ -324,6 +355,23 @@ onMounted(() => {
           />
         </div>
 
+        <!-- Provider 可见性 -->
+        <div class="flex items-center justify-between rounded border border-cockpit-border bg-cockpit-bg px-3 py-2">
+          <div class="min-w-0">
+            <div class="text-xs text-cockpit-text">显示在模型选择器中</div>
+            <div data-testid="provider-visibility-state" class="text-2xs text-cockpit-muted">
+              {{ editVisible ? '当前显示' : '当前隐藏' }}
+            </div>
+          </div>
+          <button
+            data-testid="provider-visibility-toggle"
+            class="px-2 py-1 text-xs rounded bg-cockpit-surface-sunken text-cockpit-text hover:bg-cockpit-border/40 transition-colors"
+            @click="toggleProviderVisibility"
+          >
+            {{ editVisible ? '隐藏' : '显示' }}
+          </button>
+        </div>
+
         <!-- API Key -->
         <div>
           <label class="block text-xs text-cockpit-muted mb-1">API 密钥</label>
@@ -349,14 +397,14 @@ onMounted(() => {
           <label class="block text-xs text-cockpit-muted mb-1">默认模型</label>
           <select
             class="w-full bg-cockpit-bg border border-cockpit-border rounded px-3 py-1.5 text-sm text-cockpit-text focus:outline-none focus:border-cockpit-accent"
+            :value="getDefaultModelSelector()"
             @change="(e: Event) => setDefaultModel((e.target as HTMLSelectElement).value)"
           >
             <option value="" disabled>选择默认模型</option>
             <option
               v-for="m in editModels"
-              :key="m.id"
-              :value="m.id"
-              :selected="m.isDefault"
+              :key="getModelSelector(m as any)"
+              :value="getModelSelector(m as any)"
             >
               {{ m.name }} ({{ m.id }})
             </option>
@@ -373,7 +421,7 @@ onMounted(() => {
           <div class="space-y-1 mb-2 max-h-40 overflow-y-auto">
             <div
               v-for="(m, idx) in editModels"
-              :key="m.id"
+              :key="getModelSelector(m as any)"
               class="flex items-center justify-between bg-cockpit-bg border border-cockpit-border rounded px-3 py-1.5 group"
             >
               <div class="flex items-center gap-2 min-w-0">
@@ -385,14 +433,29 @@ onMounted(() => {
                 >
                   默认
                 </span>
+                <span
+                  class="text-2xs px-1 rounded"
+                  :class="isVisible(m) ? 'text-cockpit-success bg-cockpit-success/10' : 'text-cockpit-muted bg-cockpit-border/30'"
+                >
+                  {{ isVisible(m) ? '显示' : '隐藏' }}
+                </span>
               </div>
-              <button
-                class="text-cockpit-muted hover:text-cockpit-danger opacity-0 group-hover:opacity-100 transition-opacity text-xs flex-shrink-0 ml-2"
-                @click="removeModel(idx)"
-                title="移除模型"
-              >
-                ✕
-              </button>
+              <div class="flex items-center gap-1">
+                <button
+                  class="text-cockpit-muted hover:text-cockpit-text opacity-0 group-hover:opacity-100 transition-opacity text-xs flex-shrink-0"
+                  @click="toggleModelVisibility(idx)"
+                  :title="isVisible(m) ? '隐藏模型' : '显示模型'"
+                >
+                  {{ isVisible(m) ? '👁' : '🙈' }}
+                </button>
+                <button
+                  class="text-cockpit-muted hover:text-cockpit-danger opacity-0 group-hover:opacity-100 transition-opacity text-xs flex-shrink-0 ml-2"
+                  @click="removeModel(idx)"
+                  title="移除模型"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
 

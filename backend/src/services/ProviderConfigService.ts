@@ -15,36 +15,40 @@ const DEFAULT_CONFIG: ProvidersConfig = {
       name: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com',
       apiKey: '',
+      visible: true,
       models: [
-        { id: 'deepseek-chat', name: 'DeepSeek V3', isDefault: true },
-        { id: 'deepseek-reasoner', name: 'DeepSeek R1' },
+        { id: 'deepseek-chat', name: 'DeepSeek V3', isDefault: true, visible: true },
+        { id: 'deepseek-reasoner', name: 'DeepSeek R1', visible: true },
       ],
     },
     openai: {
       name: 'OpenAI',
       baseUrl: 'https://api.openai.com',
       apiKey: '',
+      visible: true,
       models: [
-        { id: 'gpt-4o', name: 'GPT-4o', isDefault: true },
-        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4o', name: 'GPT-4o', isDefault: true, visible: true },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', visible: true },
       ],
     },
     alibaba: {
       name: 'Alibaba',
       baseUrl: 'https://dashscope.aliyuncs.com',
       apiKey: '',
+      visible: true,
       models: [
-        { id: 'qwen-plus', name: 'Qwen Plus', isDefault: true },
-        { id: 'qwen-max', name: 'Qwen Max' },
+        { id: 'qwen-plus', name: 'Qwen Plus', isDefault: true, visible: true },
+        { id: 'qwen-max', name: 'Qwen Max', visible: true },
       ],
     },
     anthropic: {
       name: 'Anthropic',
       baseUrl: 'https://api.anthropic.com',
       apiKey: '',
+      visible: true,
       models: [
-        { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', isDefault: true },
-        { id: 'claude-3-opus', name: 'Claude 3 Opus' },
+        { id: 'claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', isDefault: true, visible: true },
+        { id: 'claude-3-opus', name: 'Claude 3 Opus', visible: true },
       ],
     },
   },
@@ -132,6 +136,7 @@ export class ProviderConfigService {
         name: cfg.name,
         configured: hasUsableApiKey(cfg.apiKey),
         modelCount: cfg.models.length,
+        visible: cfg.visible !== false,
       });
     }
     return summaries;
@@ -146,25 +151,48 @@ export class ProviderConfigService {
       name: cfg.name,
       baseUrl: cfg.baseUrl,
       apiKey: maskApiKey(cfg.apiKey),
+      visible: cfg.visible !== false,
       models: cfg.models.map((m) => ({ ...m })),
     };
   }
 
   /** 获取合并后的模型列表 */
-  getMergedModels(): { id: string; name: string; provider: string; isDefault: boolean }[] {
-    const models: { id: string; name: string; provider: string; isDefault: boolean }[] = [];
-    const seen = new Set<string>();
+  getMergedModels(): Array<{
+    id: string;
+    name: string;
+    provider: string;
+    isDefault: boolean;
+    providerId: string;
+    modelId: string;
+    selector: string;
+    visible: boolean;
+  }> {
+    const models: Array<{
+      id: string;
+      name: string;
+      provider: string;
+      isDefault: boolean;
+      providerId: string;
+      modelId: string;
+      selector: string;
+      visible: boolean;
+    }> = [];
     for (const [providerId, cfg] of this.configCache) {
+      if (cfg.visible === false) {
+        continue;
+      }
       for (const m of cfg.models) {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          models.push({
-            id: m.id,
-            name: m.name,
-            provider: cfg.name,
-            isDefault: m.isDefault ?? false,
-          });
-        }
+        const visible = m.visible ?? true;
+        models.push({
+          id: m.id,
+          name: m.name,
+          provider: cfg.name,
+          isDefault: m.isDefault ?? false,
+          providerId,
+          modelId: m.id,
+          selector: `${providerId}/${m.id}`,
+          visible,
+        });
       }
     }
     return models;
@@ -183,9 +211,12 @@ export class ProviderConfigService {
       if (explicitProviderId && providerId.toLowerCase() !== explicitProviderId.toLowerCase()) {
         continue;
       }
+      if (cfg.visible === false) {
+        continue;
+      }
 
       const model = cfg.models.find((m) => m.id.toLowerCase() === modelId.toLowerCase());
-      if (!model || !hasUsableApiKey(cfg.apiKey) || !cfg.baseUrl.trim()) {
+      if (!model || model.visible === false || !hasUsableApiKey(cfg.apiKey) || !cfg.baseUrl.trim()) {
         continue;
       }
 
@@ -210,6 +241,7 @@ export class ProviderConfigService {
       name,
       baseUrl,
       apiKey: '',
+      visible: true,
       models: [],
     };
 
@@ -238,7 +270,7 @@ export class ProviderConfigService {
   }
 
   /** 更新 provider 配置 */
-  async updateProvider(id: string, updates: { name?: string; baseUrl?: string; apiKey?: string; models?: ProviderModel[] }): Promise<ProviderConfig | null> {
+  async updateProvider(id: string, updates: { name?: string; baseUrl?: string; apiKey?: string; visible?: boolean; models?: ProviderModel[] }): Promise<ProviderConfig | null> {
     const cfg = this.configCache.get(id);
     if (!cfg) return null;
 
@@ -246,6 +278,7 @@ export class ProviderConfigService {
 
     if (updates.name !== undefined) cfg.name = updates.name;
     if (updates.baseUrl !== undefined) cfg.baseUrl = updates.baseUrl;
+    if (updates.visible !== undefined) cfg.visible = updates.visible;
     if (updates.apiKey !== undefined) {
       if (isMaskedApiKeyPlaceholder(updates.apiKey)) {
         delete repoUpdates.apiKey;

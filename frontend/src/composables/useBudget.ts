@@ -8,6 +8,7 @@ import type {
   DailyTokenRecord,
   ModelInfo,
 } from '@/types';
+import { getModelSelector } from '@/utils/modelSelector';
 
 export function useBudget() {
   const budgetConfig: Ref<BudgetConfig> = ref({
@@ -112,7 +113,10 @@ export function useBudget() {
       ]);
       budgetConfig.value = config;
       budgetStatus.value = status;
-      models.value = modelList;
+      models.value = modelList.map((model) => ({
+        ...model,
+        id: getModelSelector(model),
+      }));
     } catch (err) {
       console.error('[useBudget] Init failed:', err);
     }

@@ -35,6 +35,7 @@ const agentsMock = {
   terminalOutputs: ref(new Map()),
   markdownOutputs: ref(new Map()),
   conversationEvents: ref(new Map()),
+  sendStates: ref(new Map()),
   launchError: ref(null),
   activeConflicts: ref([]),
   loadAgents: vi.fn().mockResolvedValue([]),
@@ -187,6 +188,32 @@ describe('AppLayout WebSocket routing', () => {
 
     expect(agentsMock.appendConversationEvent).toHaveBeenCalledWith(assistantEvent, false);
     expect(agentsMock.appendFormalOutput).toHaveBeenCalledWith('agent-1', 'Final answer');
+  });
+
+  it('routes completed assistant structured events to terminal output when no raw stdout arrived', () => {
+    mountLayout();
+    agentsMock.appendOutput.mockClear();
+
+    const assistantEvent: AgentConversationEvent = {
+      id: 'evt-turn-end',
+      agentId: 'agent-1',
+      kind: 'assistant',
+      title: 'Assistant',
+      content: 'Final answer from turn end',
+      status: 'completed',
+      createdAt: 2,
+    };
+
+    handlers.get('agent:event')?.({
+      type: 'agent:event',
+      agentId: 'agent-1',
+      payload: assistantEvent,
+      timestamp: 2,
+    });
+
+    expect(agentsMock.appendConversationEvent).toHaveBeenCalledWith(assistantEvent, false);
+    expect(agentsMock.appendFormalOutput).toHaveBeenCalledWith('agent-1', 'Final answer from turn end');
+    expect(agentsMock.appendOutput).toHaveBeenCalledWith('agent-1', 'Final answer from turn end', false);
   });
 
   it('does not append formal output for duplicate structured events', () => {
