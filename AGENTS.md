@@ -27,9 +27,10 @@
 cyberpal_cockpit/
 ├── AGENTS.md                    ← 本文件
 ├── .gitignore                   # 忽略 .tmp/、node_modules/、dist/
-├── .tmp/                        # 开发临时文件（截图、日志等）
+├── .tmp/                        # 开发临时文件（截图、日志等）；临时分析/规划草案可放在 `.tmp/docs/`
 ├── docs/
 │   ├── multi-agent-platform-design.md   # 产品设计文档
+│   ├── ui-design-system.md               # UI 设计系统
 │   └── user-guide.md                    # 使用说明书
 ├── frontend/                    # Vue 3 SPA
 │   ├── src/
@@ -230,6 +231,7 @@ Mock：优先使用 vi.mock() / vi.fn()，不依赖真实 oh-my-pi 进程
 - 文件操作 → WorkspaceService
 - 进程操作 → AgentManager
 - 持久化 → Repository → DatabaseInterface
+- 当前阶段的分析、规划、验收草案优先写入 `.tmp/docs/`；只有长期保留的规范/说明才放入 `docs/`
 
 ### 6.3 路径约定
 
