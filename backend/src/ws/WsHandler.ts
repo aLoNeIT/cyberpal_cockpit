@@ -1,14 +1,29 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { WSMessage, ConflictEvent, TokenUpdateEvent, BudgetStatus } from '../types/index.js';
+import type {
+  WSMessage,
+  ConflictEvent,
+  TokenUpdateEvent,
+  BudgetStatus,
+  TerminalCreatePayload,
+  TerminalInputPayload,
+  TerminalResizePayload,
+  TerminalSessionPayload,
+} from '../types/index.js';
 import { CONFIG } from '../config.js';
+import type { TerminalSessionService } from '../services/TerminalSessionService.js';
 
 export class WsHandler {
   private wss: WebSocketServer;
   private connections: Map<WebSocket, Set<string>> = new Map();
   private heartbeatTimers: Map<WebSocket, ReturnType<typeof setInterval>> = new Map();
+  private terminalSessionsBySocket: Map<WebSocket, Set<string>> = new Map();
+  private terminalSocketBySession: Map<string, WebSocket> = new Map();
+  private terminalSessionService?: TerminalSessionService;
 
-  constructor(wss: WebSocketServer) {
+  constructor(wss: WebSocketServer, terminalSessionService?: TerminalSessionService) {
     this.wss = wss;
+    this.terminalSessionService = terminalSessionService;
+    this.bindTerminalService();
   }
 
   handleConnection(ws: WebSocket): void {
@@ -43,6 +58,10 @@ export class WsHandler {
           return;
         }
 
+        if (this.handleTerminalMessage(ws, msg)) {
+          return;
+        }
+
         if (msg.type === 'subscribe' && msg.agentId) {
           const subs = this.connections.get(ws);
           if (subs) {
@@ -65,21 +84,11 @@ export class WsHandler {
     });
 
     ws.on('close', () => {
-      const timer = this.heartbeatTimers.get(ws);
-      if (timer) {
-        clearInterval(timer);
-        this.heartbeatTimers.delete(ws);
-      }
-      this.connections.delete(ws);
+      this.cleanupSocket(ws);
     });
 
     ws.on('error', () => {
-      const timer = this.heartbeatTimers.get(ws);
-      if (timer) {
-        clearInterval(timer);
-        this.heartbeatTimers.delete(ws);
-      }
-      this.connections.delete(ws);
+      this.cleanupSocket(ws);
     });
   }
 
@@ -198,5 +207,199 @@ export class WsHandler {
         this.sendToSocket(ws, message);
       }
     }
+  }
+
+  private bindTerminalService(): void {
+    if (!this.terminalSessionService) return;
+
+    this.terminalSessionService.onData = (sessionId, data) => {
+      const ws = this.terminalSocketBySession.get(sessionId);
+      if (!ws) return;
+      this.sendToSocket(ws, {
+        type: 'terminal:data',
+        payload: { sessionId, data },
+        timestamp: Date.now(),
+      });
+    };
+
+    this.terminalSessionService.onCwd = (sessionId, cwd) => {
+      const ws = this.terminalSocketBySession.get(sessionId);
+      if (!ws) return;
+      this.sendToSocket(ws, {
+        type: 'terminal:cwd',
+        payload: { sessionId, cwd },
+        timestamp: Date.now(),
+      });
+    };
+
+    this.terminalSessionService.onExit = (sessionId, exitCode, signal) => {
+      const ws = this.terminalSocketBySession.get(sessionId);
+      if (!ws) return;
+
+      this.removeTerminalOwnership(ws, sessionId);
+      this.sendToSocket(ws, {
+        type: 'terminal:exit',
+        payload: { sessionId, exitCode, signal },
+        timestamp: Date.now(),
+      });
+    };
+
+    this.terminalSessionService.onError = (sessionId, message) => {
+      const ws = sessionId ? this.terminalSocketBySession.get(sessionId) : undefined;
+      const payload = { sessionId, message };
+
+      if (ws) {
+        this.sendToSocket(ws, {
+          type: 'terminal:error',
+          payload,
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      this.broadcastToAll({
+        type: 'terminal:error',
+        payload,
+        timestamp: Date.now(),
+      });
+    };
+  }
+
+  private handleTerminalMessage(ws: WebSocket, msg: WSMessage): boolean {
+    if (!msg.type.startsWith('terminal:')) return false;
+
+    if (!this.terminalSessionService) {
+      this.sendTerminalError(ws, undefined, 'Terminal service is not available');
+      return true;
+    }
+
+    try {
+      switch (msg.type) {
+        case 'terminal:create': {
+          const payload = msg.payload as Partial<TerminalCreatePayload>;
+          if (!this.isPositiveDimension(payload.cols) || !this.isPositiveDimension(payload.rows)) {
+            this.sendTerminalError(ws, undefined, 'cols and rows are required');
+            return true;
+          }
+
+          const session = this.terminalSessionService.createSession({
+            cwd: payload.cwd,
+            shell: payload.shell,
+            cols: payload.cols,
+            rows: payload.rows,
+          });
+
+          this.addTerminalOwnership(ws, session.id);
+          this.sendToSocket(ws, {
+            type: 'terminal:created',
+            payload: {
+              sessionId: session.id,
+              cwd: session.cwd,
+              shell: session.shell,
+              pid: session.pid,
+            },
+            timestamp: Date.now(),
+          });
+          return true;
+        }
+
+        case 'terminal:input': {
+          const payload = msg.payload as Partial<TerminalInputPayload>;
+          if (this.ownsTerminalSession(ws, payload.sessionId) && typeof payload.data === 'string') {
+            this.terminalSessionService.write(payload.sessionId, payload.data);
+          }
+          return true;
+        }
+
+        case 'terminal:resize': {
+          const payload = msg.payload as Partial<TerminalResizePayload>;
+          if (
+            this.ownsTerminalSession(ws, payload.sessionId)
+            && this.isPositiveDimension(payload.cols)
+            && this.isPositiveDimension(payload.rows)
+          ) {
+            this.terminalSessionService.resize(payload.sessionId, payload.cols, payload.rows);
+          }
+          return true;
+        }
+
+        case 'terminal:cwd-request': {
+          const payload = msg.payload as Partial<TerminalSessionPayload>;
+          if (this.ownsTerminalSession(ws, payload.sessionId)) {
+            this.terminalSessionService.requestCwd(payload.sessionId);
+          }
+          return true;
+        }
+
+        case 'terminal:kill': {
+          const payload = msg.payload as Partial<TerminalSessionPayload>;
+          if (this.ownsTerminalSession(ws, payload.sessionId)) {
+            this.terminalSessionService.kill(payload.sessionId);
+          }
+          return true;
+        }
+
+        default:
+          return true;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Terminal request failed';
+      this.sendTerminalError(ws, undefined, message);
+      return true;
+    }
+  }
+
+  private addTerminalOwnership(ws: WebSocket, sessionId: string): void {
+    if (!this.terminalSessionsBySocket.has(ws)) {
+      this.terminalSessionsBySocket.set(ws, new Set());
+    }
+    this.terminalSessionsBySocket.get(ws)!.add(sessionId);
+    this.terminalSocketBySession.set(sessionId, ws);
+  }
+
+  private removeTerminalOwnership(ws: WebSocket, sessionId: string): void {
+    const sessions = this.terminalSessionsBySocket.get(ws);
+    if (sessions) {
+      sessions.delete(sessionId);
+      if (sessions.size === 0) {
+        this.terminalSessionsBySocket.delete(ws);
+      }
+    }
+    this.terminalSocketBySession.delete(sessionId);
+  }
+
+  private ownsTerminalSession(ws: WebSocket, sessionId: unknown): sessionId is string {
+    return typeof sessionId === 'string' && this.terminalSessionsBySocket.get(ws)?.has(sessionId) === true;
+  }
+
+  private cleanupSocket(ws: WebSocket): void {
+    const timer = this.heartbeatTimers.get(ws);
+    if (timer) {
+      clearInterval(timer);
+      this.heartbeatTimers.delete(ws);
+    }
+
+    this.connections.delete(ws);
+
+    const terminalSessionIds = Array.from(this.terminalSessionsBySocket.get(ws) || []);
+    if (terminalSessionIds.length > 0) {
+      this.terminalSessionService?.killAll(terminalSessionIds);
+      for (const sessionId of terminalSessionIds) {
+        this.terminalSocketBySession.delete(sessionId);
+      }
+      this.terminalSessionsBySocket.delete(ws);
+    }
+  }
+
+  private sendTerminalError(ws: WebSocket, sessionId: string | undefined, message: string): void {
+    this.sendToSocket(ws, {
+      type: 'terminal:error',
+      payload: { sessionId, message },
+      timestamp: Date.now(),
+    });
+  }
+
+  private isPositiveDimension(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0;
   }
 }

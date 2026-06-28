@@ -21,6 +21,7 @@ import type {
   FsBrowseResponse,
   FsHomeResponse,
   FsDrivesResponse,
+  TerminalListResponse,
 } from '@/types';
 
 const http = axios.create({
@@ -201,6 +202,15 @@ export async function fetchFsBrowse(dirPath: string): Promise<FsBrowseResponse> 
 
 export async function fetchFsDrives(): Promise<FsDrivesResponse> {
   const res = await http.get<ApiResponse<FsDrivesResponse>>('/fs/drives');
+  return res.data.data;
+}
+
+// ============ Demo Terminal API ============
+
+export async function fetchTerminalFileList(dirPath: string): Promise<TerminalListResponse> {
+  const res = await http.get<ApiResponse<TerminalListResponse>>('/demo-terminal/list', {
+    params: { path: dirPath },
+  });
   return res.data.data;
 }
 

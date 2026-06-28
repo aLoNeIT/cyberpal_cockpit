@@ -2,16 +2,25 @@ import { CONNECTION } from '@/utils/constants';
 import type { WSMessage } from '@/types';
 
 export type MessageHandler = (message: WSMessage) => void;
+export type ConnectionChangeEvent =
+  | { status: 'connected' }
+  | { status: 'reconnecting'; attempt: number; delay: number }
+  | { status: 'disconnected'; reason: 'closed' | 'heartbeat-timeout' | 'max-reconnect-attempts' }
+  | { status: 'error'; error: Event };
+export type ConnectionChangeHandler = (event: ConnectionChangeEvent) => void;
 
 export class WSClient {
   private ws: WebSocket | null = null;
   private url: string;
   private handlers: Map<string, Set<MessageHandler>> = new Map();
+  private connectionHandlers: Set<ConnectionChangeHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private intentionalClose = false;
+  private pendingMessages: Array<Partial<WSMessage> & { type: string }> = [];
+  private nextCloseReason: 'closed' | 'heartbeat-timeout' = 'closed';
 
   public onConnected: (() => void) | null = null;
   public onDisconnected: (() => void) | null = null;
@@ -33,8 +42,11 @@ export class WSClient {
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
+        this.nextCloseReason = 'closed';
+        this.flushPendingMessages();
         this.startHeartbeat();
         this.onConnected?.();
+        this.notifyConnectionChange({ status: 'connected' });
       };
 
       this.ws.onmessage = (event: MessageEvent) => {
@@ -43,6 +55,7 @@ export class WSClient {
 
           // 心跳处理
           if (msg.type === 'ping') {
+            this.resetPongTimeout();
             this.send({ type: 'pong', payload: {}, timestamp: Date.now() });
             return;
           }
@@ -64,6 +77,8 @@ export class WSClient {
       this.ws.onclose = () => {
         this.stopHeartbeat();
         this.onDisconnected?.();
+        this.notifyConnectionChange({ status: 'disconnected', reason: this.nextCloseReason });
+        this.nextCloseReason = 'closed';
 
         if (!this.intentionalClose) {
           this.scheduleReconnect();
@@ -72,6 +87,7 @@ export class WSClient {
 
       this.ws.onerror = (error: Event) => {
         this.onError?.(error);
+        this.notifyConnectionChange({ status: 'error', error });
       };
     } catch {
       this.scheduleReconnect();
@@ -82,6 +98,7 @@ export class WSClient {
     this.intentionalClose = true;
     this.stopHeartbeat();
     this.cancelReconnect();
+    this.pendingMessages = [];
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -90,13 +107,12 @@ export class WSClient {
 
   send(message: Partial<WSMessage> & { type: string }): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      const fullMessage: WSMessage = {
-        ...message,
-        timestamp: message.timestamp || Date.now(),
-        agentId: message.agentId,
-        payload: message.payload ?? {},
-      } as WSMessage;
-      this.ws.send(JSON.stringify(fullMessage));
+      this.sendNow(message);
+      return;
+    }
+
+    if (this.ws?.readyState === WebSocket.CONNECTING) {
+      this.pendingMessages.push(message);
     }
   }
 
@@ -122,14 +138,24 @@ export class WSClient {
     }
   }
 
+  onConnectionChange(handler: ConnectionChangeHandler): () => void {
+    this.connectionHandlers.add(handler);
+    return () => {
+      this.connectionHandlers.delete(handler);
+    };
+  }
+
   get isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
   private scheduleReconnect(): void {
     if (this.intentionalClose) return;
+    if (this.reconnectTimer) return;
+
     if (this.reconnectAttempts >= CONNECTION.reconnectMaxAttempts) {
       console.error('[WSClient] Max reconnect attempts reached');
+      this.notifyConnectionChange({ status: 'disconnected', reason: 'max-reconnect-attempts' });
       return;
     }
 
@@ -137,8 +163,12 @@ export class WSClient {
       CONNECTION.reconnectBaseDelay * Math.pow(2, this.reconnectAttempts),
       CONNECTION.reconnectMaxDelay,
     );
+    const attempt = this.reconnectAttempts + 1;
+
+    this.notifyConnectionChange({ status: 'reconnecting', attempt, delay });
 
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       this.reconnectAttempts++;
       this.connect();
     }, delay);
@@ -155,12 +185,29 @@ export class WSClient {
     this.resetPongTimeout();
   }
 
+  private flushPendingMessages(): void {
+    const messages = [...this.pendingMessages];
+    this.pendingMessages = [];
+    messages.forEach((message) => this.send(message));
+  }
+
+  private sendNow(message: Partial<WSMessage> & { type: string }): void {
+    const fullMessage: WSMessage = {
+      ...message,
+      timestamp: message.timestamp || Date.now(),
+      agentId: message.agentId,
+      payload: message.payload ?? {},
+    } as WSMessage;
+    this.ws?.send(JSON.stringify(fullMessage));
+  }
+
   private resetPongTimeout(): void {
     if (this.pongTimeout) {
       clearTimeout(this.pongTimeout);
     }
     this.pongTimeout = setTimeout(() => {
       console.warn('[WSClient] Heartbeat timeout, reconnecting...');
+      this.nextCloseReason = 'heartbeat-timeout';
       this.ws?.close();
     }, CONNECTION.heartbeatTimeout);
   }
@@ -174,6 +221,10 @@ export class WSClient {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
+  }
+
+  private notifyConnectionChange(event: ConnectionChangeEvent): void {
+    this.connectionHandlers.forEach((handler) => handler(event));
   }
 }
 

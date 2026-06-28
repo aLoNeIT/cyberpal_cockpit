@@ -10,12 +10,14 @@ import { ConflictDetector } from './services/ConflictDetector.js';
 import { TokenTracker } from './services/TokenTracker.js';
 import { BudgetController } from './services/BudgetController.js';
 import { ProviderConfigService } from './services/ProviderConfigService.js';
+import { TerminalSessionService } from './services/TerminalSessionService.js';
 import { WsHandler } from './ws/WsHandler.js';
 import { createAgentRoutes } from './routes/agents.js';
 import { createWorkspaceRoutes } from './routes/workspaces.js';
 import { createBudgetRoutes } from './routes/budget.js';
 import { createModelRoutes } from './routes/models.js';
 import { createSettingsRoutes } from './routes/settings.js';
+import { createDemoTerminalRoutes } from './routes/demoTerminal.js';
 
 // Phase 4: 数据库持久化
 import { ConnectionManager } from './db/ConnectionManager.js';
@@ -56,6 +58,7 @@ const conflictDetector = new ConflictDetector();
 const tokenTracker = new TokenTracker(tokenRepo);
 const budgetController = new BudgetController(tokenTracker);
 const providerConfigService = new ProviderConfigService(providerRepo);
+const terminalSessionService = new TerminalSessionService();
 
 // Phase 3: 注入依赖到 AgentManager
 agentManager.injectDependencies(tokenTracker, budgetController, providerConfigService);
@@ -71,12 +74,13 @@ app.use('/api', createWorkspaceRoutes(workspaceService, fileWatcher, workspaceRe
 app.use('/api', createBudgetRoutes(budgetController, tokenTracker));
 app.use('/api', createModelRoutes(providerConfigService));
 app.use('/api', createSettingsRoutes(providerConfigService));
+app.use('/api', createDemoTerminalRoutes());
 
 // 创建 HTTP + WebSocket 服务器
 const server = createServer(app);
 
 const wss = new WebSocketServer({ server, path: '/ws' });
-const wsHandler = new WsHandler(wss);
+const wsHandler = new WsHandler(wss, terminalSessionService);
 
 // WebSocket 连接处理
 wss.on('connection', (ws: WebSocket) => {
@@ -216,4 +220,17 @@ start().catch((err) => {
   process.exit(1);
 });
 
-export { app, server, wss, agentManager, fileWatcher, workspaceService, wsHandler, conflictDetector, tokenTracker, budgetController, providerConfigService };
+export {
+  app,
+  server,
+  wss,
+  agentManager,
+  fileWatcher,
+  workspaceService,
+  wsHandler,
+  conflictDetector,
+  tokenTracker,
+  budgetController,
+  providerConfigService,
+  terminalSessionService,
+};

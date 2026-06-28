@@ -79,6 +79,74 @@ export interface FsDrivesResponse {
   homeDrive: string;
 }
 
+// ============ Demo Terminal 类型 ============
+
+export interface TerminalFileEntry {
+  name: string;
+  path: string;
+  type: 'directory' | 'file';
+  size: number;
+  modifiedAt: number;
+  hasChildren?: boolean;
+  children?: TerminalFileEntry[];
+}
+
+export interface TerminalListResponse {
+  path: string;
+  parentPath: string | null;
+  entries: TerminalFileEntry[];
+}
+
+export interface TerminalCreatePayload {
+  cwd?: string;
+  shell?: string;
+  cols: number;
+  rows: number;
+}
+
+export interface TerminalCreatedPayload {
+  sessionId: string;
+  cwd: string;
+  shell: string;
+  pid: number | null;
+}
+
+export interface TerminalInputPayload {
+  sessionId: string;
+  data: string;
+}
+
+export interface TerminalResizePayload {
+  sessionId: string;
+  cols: number;
+  rows: number;
+}
+
+export interface TerminalSessionPayload {
+  sessionId: string;
+}
+
+export interface TerminalDataPayload {
+  sessionId: string;
+  data: string;
+}
+
+export interface TerminalCwdPayload {
+  sessionId: string;
+  cwd: string;
+}
+
+export interface TerminalExitPayload {
+  sessionId: string;
+  exitCode: number | null;
+  signal?: number;
+}
+
+export interface TerminalErrorPayload {
+  sessionId?: string;
+  message: string;
+}
+
 // ============ 提供商配置类型 ============
 
 export interface ProviderModel {
@@ -233,6 +301,11 @@ export type WSMessageType =
   | { type: 'agent:irc-dm'; payload: { from: string; to: string; message: string }; timestamp: number }
   | { type: 'agent:irc-broadcast'; payload: { from: string; message: string }; timestamp: number }
   | { type: 'agent:conflict'; payload: ConflictEvent; timestamp: number }
+  | { type: 'terminal:created'; payload: TerminalCreatedPayload; timestamp: number }
+  | { type: 'terminal:data'; payload: TerminalDataPayload; timestamp: number }
+  | { type: 'terminal:cwd'; payload: TerminalCwdPayload; timestamp: number }
+  | { type: 'terminal:exit'; payload: TerminalExitPayload; timestamp: number }
+  | { type: 'terminal:error'; payload: TerminalErrorPayload; timestamp: number }
   // Phase 3 新增
   | { type: 'agent:token-update'; payload: TokenUpdateEvent; timestamp: number }
   | { type: 'budget:warning'; payload: BudgetStatus; timestamp: number };
